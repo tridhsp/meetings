@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>Meetings</title>
+
+  <link rel="icon" type="image/png" sizes="32x32"
+    href="https://files.tansinh.info/ads/tridhsp_1752750602636_ad_tridhsp_1752750602636.png" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css?v=20260516_1544" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+  <!-- Supabase UMD build -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.4/dist/umd/supabase.js" defer></script>
+ <script src="script.js?v=20260516_1544" defer></script>
+<script>window.addEventListener('pageshow', function(e) { if (e.persisted) location.reload(); });</script>
+
+</head>
+
+<body>
+  <!-- ---------- Login Card ---------- -->
+  <div class="card" id="loginCard">
+    <div class="logo">Meetings</div>
+    <div class="subtitle">Đăng nhập bằng email &amp; mật khẩu của bạn</div>
+
+    <div class="field">
+      <input id="email" type="email" autocomplete="username" placeholder="Email" required />
+    </div>
+
+    <div class="field">
+      <input id="password" type="password" autocomplete="current-password" placeholder="Mật khẩu" required />
+      <button class="toggle-password" id="togglePwd" aria-label="Hiện/ẩn mật khẩu">👁️</button>
+    </div>
+
+    <button class="btn" id="login">Đăng nhập</button>
+    <div id="message" aria-live="polite"></div>
+  </div>
+
+  <!-- Sidebar Menu Button (hamburger) -->
+  <button id="sidebarToggle" class="sidebar-toggle" aria-label="Open menu">
+    <i class="fa-solid fa-bars"></i>
+  </button>
+
+
+
+  <!-- Sidebar -->
+  <div id="sidebar" class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <i class="fa-solid fa-calendar-check"></i>
+        <span>Meetings</span>
+      </div>
+      <button id="sidebarClose" class="sidebar-close" aria-label="Close menu">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+    
+<nav class="sidebar-nav">
+      <a href="./index.html" class="sidebar-link active">
+        <i class="fa-solid fa-house"></i>
+        <span>Trang chủ</span>
+      </a>
+      <a href="./confirmation.html" class="sidebar-link">
+        <i class="fa-solid fa-calendar-check"></i>
+        <span>Xác nhận lịch</span>
+      </a>
+
+      <a href="./studentmeeting.html" class="sidebar-link">
+        <i class="fa-solid fa-user-graduate"></i>
+        <span>Student Meeting</span>
+      </a>
+      <a href="./offteachers.html" class="sidebar-link">
+        <i class="fa-solid fa-user-slash"></i>
+        <span>GV Nghỉ</span>
+      </a>
+      
+      <!-- Week Selector Section -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Chọn tuần xem</div>
+        <div class="sidebar-week-selector">
+          <button id="sidebarWeekPrev" class="sidebar-week-btn">
+            <i class="fa-solid fa-chevron-left"></i>
+          </button>
+          <div id="sidebarWeekLabel" class="sidebar-week-label">Tuần này</div>
+          <button id="sidebarWeekNext" class="sidebar-week-btn">
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+        </div>
+        <button id="sidebarWeekToday" class="sidebar-week-today">
+          <i class="fa-solid fa-calendar-day"></i>
+          <span>Về tuần hiện tại</span>
+        </button>
+        <button id="sidebarWeekPicker" class="sidebar-week-picker">
+          <i class="fa-solid fa-calendar-alt"></i>
+          <span>Chọn tuần cụ thể</span>
+        </button>
+      </div>
+      
+      <!-- Admin Actions Section (will be shown/hidden by JS) -->
+      <div id="sidebarAdminSection" class="sidebar-section" style="display: none;">
+        <div class="sidebar-section-title">Thao tác Admin</div>
+        <button id="sidebarAddMeeting" class="sidebar-action-btn sidebar-action-add">
+          <i class="fa-solid fa-plus"></i>
+          <span>Thêm meeting link</span>
+        </button>
+        <button id="sidebarAddWorking" class="sidebar-action-btn sidebar-action-working">
+          <i class="fa-solid fa-briefcase"></i>
+          <span>Thêm ca làm việc</span>
+        </button>
+      </div>
+    </nav>
+    
+    <div class="sidebar-footer">
+      <button id="sidebarLogout" class="sidebar-logout">
+        <i class="fa-solid fa-power-off"></i>
+        <span>Đăng xuất</span>
+      </button>
+    </div>
+  </div>
+  
+  <!-- Sidebar Overlay -->
+  <div id="sidebarOverlay" class="sidebar-overlay"></div>
+
+  <!-- Meeting Links list -->
+
+  <!-- Week navigation (top-right) -->
+<div id="weekNav" class="week-nav" hidden>
+  <button id="weekPrev" class="week-nav__btn" title="Tuần trước">
+    <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+  </button>
+
+  <div id="weekLabel" class="week-nav__label">--/-- – --/--</div>
+
+  <button id="weekNext" class="week-nav__btn" title="Tuần sau">
+    <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+  </button>
+
+  <button id="weekToday" class="week-nav__btn week-nav__today" title="Tuần này">
+    <i class="fa-solid fa-calendar-day" aria-hidden="true"></i>
+  </button>
+</div>
+
+
+<!-- Work meetings (from meeting_content) -->
+<section class="meeting-list" id="workMeetings"></section>
+
+<!-- Off Teachers Today Box -->
+<div id="offTeachersBox" class="off-today-box" style="display:none"></div>
+
+
+
+</body>
+
+</html>
+

@@ -1,0 +1,1972 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>Xác nhận lịch làm việc</title>
+
+  <link rel="icon" type="image/png" sizes="32x32"
+    href="https://files.tansinh.info/ads/tridhsp_1752750602636_ad_tridhsp_1752750602636.png" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css?v=20260516_1544" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.4/dist/umd/supabase.js" defer></script>
+  <script src="confirmation.js?v=20260516_1544" defer></script>
+<script>window.addEventListener('pageshow', function(e) { if (e.persisted) location.reload(); });</script>
+
+  <style>
+    /* Confirmation page specific styles */
+.confirmation-container {
+      width: min(1800px, 98vw);
+      margin: 20px auto;
+      padding: 0 16px 100px 16px;
+    }
+
+    .confirmation-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .confirmation-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .confirmation-title h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .confirmation-title i {
+      font-size: 1.8rem;
+      color: #10b981;
+    }
+
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      background: #fff;
+      color: #374151;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .back-btn:hover {
+      background: #f3f4f6;
+      border-color: #d1d5db;
+    }
+
+    /* Calendar Section */
+    .calendar-section {
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 4px 20px rgba(16, 24, 40, 0.08);
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+
+    .calendar-section-header {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #fff;
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .calendar-section-header h2 {
+      margin: 0;
+      font-size: 1.2rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .week-range-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 9999px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .calendar-section-body {
+      padding: 24px;
+    }
+
+/* Week Grid - Now vertical list layout */
+    .week-calendar-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+/* Session Row Layout - Table-like list */
+    .session-table-header {
+      display: grid;
+      grid-template-columns: 100px 140px 100px 1fr;
+      gap: 12px;
+      padding: 12px 16px;
+      background: #f1f5f9;
+      border-radius: 12px 12px 0 0;
+      font-weight: 700;
+      font-size: 12px;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+.session-row {
+      display: grid;
+      grid-template-columns: 100px 140px 100px 1fr;
+      gap: 12px;
+      padding: 14px 16px;
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+      align-items: center;
+      transition: background 0.15s;
+    }
+
+    .session-row:hover {
+      background: #f8fafc;
+    }
+
+    .session-row:last-child {
+      border-bottom: none;
+      border-radius: 0 0 12px 12px;
+    }
+
+    .session-row.is-today {
+      background: linear-gradient(90deg, #eff6ff, #fff);
+      border-left: 4px solid #3b82f6;
+    }
+
+    .session-row.is-past {
+      opacity: 0.5;
+    }
+
+    /* Day grouping styles */
+    .day-group {
+      margin-bottom: 4px;
+    }
+
+    .day-group:last-child {
+      margin-bottom: 0;
+    }
+
+.day-group-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 20px;
+      background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+      border-radius: 12px 12px 0 0;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    .day-group-header.is-past-header {
+      opacity: 0.6;
+    }
+
+    .day-group-name {
+      font-weight: 700;
+      font-size: 15px;
+      color: #0f172a;
+      min-width: 80px;
+    }
+
+    .day-group-date {
+      font-size: 13px;
+      font-weight: 600;
+      padding: 5px 12px;
+      background: #fff;
+      border-radius: 8px;
+      border: 1px solid rgba(0,0,0,0.1);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+
+    /* Day-specific colors */
+    /* Monday - Blue */
+    .day-group-header.day-mon {
+      background: linear-gradient(135deg, #eff6ff, #dbeafe);
+    }
+    .day-group-header.day-mon .day-group-name { color: #1d4ed8; }
+    .day-group-header.day-mon .day-group-date { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+    .day-group.day-mon .day-group-sessions { border-left-color: #3b82f6; }
+
+    /* Tuesday - Emerald */
+    .day-group-header.day-tue {
+      background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+    }
+    .day-group-header.day-tue .day-group-name { color: #047857; }
+    .day-group-header.day-tue .day-group-date { background: #10b981; color: #fff; border-color: #10b981; }
+    .day-group.day-tue .day-group-sessions { border-left-color: #10b981; }
+
+    /* Wednesday - Amber */
+    .day-group-header.day-wed {
+      background: linear-gradient(135deg, #fffbeb, #fef3c7);
+    }
+    .day-group-header.day-wed .day-group-name { color: #b45309; }
+    .day-group-header.day-wed .day-group-date { background: #f59e0b; color: #fff; border-color: #f59e0b; }
+    .day-group.day-wed .day-group-sessions { border-left-color: #f59e0b; }
+
+    /* Thursday - Purple */
+    .day-group-header.day-thu {
+      background: linear-gradient(135deg, #f5f3ff, #ede9fe);
+    }
+    .day-group-header.day-thu .day-group-name { color: #6d28d9; }
+    .day-group-header.day-thu .day-group-date { background: #8b5cf6; color: #fff; border-color: #8b5cf6; }
+    .day-group.day-thu .day-group-sessions { border-left-color: #8b5cf6; }
+
+    /* Friday - Rose */
+    .day-group-header.day-fri {
+      background: linear-gradient(135deg, #fff1f2, #fce7f3);
+    }
+    .day-group-header.day-fri .day-group-name { color: #be123c; }
+    .day-group-header.day-fri .day-group-date { background: #f43f5e; color: #fff; border-color: #f43f5e; }
+    .day-group.day-fri .day-group-sessions { border-left-color: #f43f5e; }
+
+    /* Saturday - Cyan */
+    .day-group-header.day-sat {
+      background: linear-gradient(135deg, #ecfeff, #cffafe);
+    }
+    .day-group-header.day-sat .day-group-name { color: #0e7490; }
+    .day-group-header.day-sat .day-group-date { background: #06b6d4; color: #fff; border-color: #06b6d4; }
+    .day-group.day-sat .day-group-sessions { border-left-color: #06b6d4; }
+
+    /* Sunday - Orange */
+    .day-group-header.day-sun {
+      background: linear-gradient(135deg, #fff7ed, #ffedd5);
+    }
+    .day-group-header.day-sun .day-group-name { color: #c2410c; }
+    .day-group-header.day-sun .day-group-date { background: #f97316; color: #fff; border-color: #f97316; }
+    .day-group.day-sun .day-group-sessions { border-left-color: #f97316; }
+
+.day-group-count {
+      margin-left: auto;
+      font-size: 12px;
+      font-weight: 600;
+      color: #64748b;
+      padding: 5px 12px;
+      background: rgba(255,255,255,0.8);
+      border-radius: 9999px;
+      border: 1px solid rgba(0,0,0,0.08);
+    }
+
+    .day-group {
+      margin-bottom: 16px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+      overflow: hidden;
+    }
+
+    .day-group:last-child {
+      margin-bottom: 0;
+    }
+
+    .day-group-sessions {
+      border-left: 4px solid #e2e8f0;
+      margin-left: 20px;
+      padding: 8px 0;
+    }
+
+    .day-group .session-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 12px 20px 12px 24px;
+      border-bottom: 1px solid #f1f5f9;
+      transition: background 0.15s;
+    }
+
+    .day-group .session-row:last-child {
+      border-bottom: none;
+    }
+
+    .day-group .session-row:hover {
+      background: linear-gradient(90deg, #fafbfc, #fff);
+    }
+
+    .session-dept {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 700;
+      border: 1px solid #e5e7eb;
+      min-width: 80px;
+      justify-content: center;
+    }
+
+    .session-notes {
+      font-size: 13px;
+      color: #64748b;
+      flex: 1;
+      padding-left: 8px;
+    }
+
+    .session-day {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .session-day-name {
+      font-weight: 700;
+      font-size: 14px;
+      color: #0f172a;
+    }
+
+    .session-day-date {
+      font-size: 12px;
+      color: #64748b;
+    }
+
+.session-time {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+      border: 1px solid #86efac;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 14px;
+      color: #166534;
+      white-space: nowrap;
+      min-width: 130px;
+      justify-content: center;
+    }
+
+    .session-time i {
+      font-size: 13px;
+      opacity: 0.8;
+    }
+
+    .session-time .time-text {
+      letter-spacing: 0.5px;
+    }
+
+    .session-time .recurring-icon {
+      margin-left: 4px;
+      font-size: 11px;
+      opacity: 0.6;
+    }
+
+    .session-dept {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 700;
+      border: 1px solid #e5e7eb;
+    }
+
+    /* Department colors */
+    .session-dept.dept-ttkb {
+      background: #eff6ff;
+      border-color: #bfdbfe;
+      color: #1d4ed8;
+    }
+    .session-dept.dept-breakout {
+      background: #ecfdf5;
+      border-color: #a7f3d0;
+      color: #047857;
+    }
+    .session-dept.dept-bm {
+      background: #fef3c7;
+      border-color: #fde68a;
+      color: #b45309;
+    }
+    .session-dept.dept-supporter {
+      background: #f5f3ff;
+      border-color: #ddd6fe;
+      color: #6d28d9;
+    }
+    .session-dept.dept-mix {
+      background: #fff1f2;
+      border-color: #fecdd3;
+      color: #be123c;
+    }
+    .session-dept.dept-default {
+      background: #f3f4f6;
+      border-color: #e5e7eb;
+      color: #374151;
+    }
+
+    .session-notes {
+      font-size: 13px;
+      color: #64748b;
+    }
+
+    .no-sessions-message {
+      text-align: center;
+      padding: 40px 20px;
+      color: #9ca3af;
+      font-style: italic;
+    }
+
+/* Mobile responsive */
+    @media (max-width: 768px) {
+      .session-table-header {
+        display: none;
+      }
+
+      .day-group-header {
+        padding: 10px 12px;
+      }
+
+      .day-group-sessions {
+        margin-left: 8px;
+        border-left-width: 2px;
+      }
+
+      .day-group .session-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 12px;
+        margin: 4px 0;
+        border-radius: 8px;
+        background: #fafbfc;
+        border: 1px solid #f1f5f9;
+      }
+
+      .day-group .session-row:hover {
+        background: #f1f5f9;
+      }
+
+      .session-time,
+      .session-dept {
+        width: fit-content;
+      }
+    }
+
+    /* Stats summary */
+    .stats-bar {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid #e5e7eb;
+    }
+
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      background: #f8fafc;
+      border-radius: 9999px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .stat-item i {
+      font-size: 14px;
+    }
+
+    .stat-item.stat-total {
+      background: #eff6ff;
+      color: #1d4ed8;
+    }
+
+    .stat-item.stat-hours {
+      background: #ecfdf5;
+      color: #047857;
+    }
+
+
+    /* Request Change Button - hidden by default, shows on hover */
+    .session-row {
+      position: relative;
+    }
+
+    .request-change-btn {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      padding: 6px 12px;
+      border: none;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s, visibility 0.2s, transform 0.2s;
+      box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      z-index: 10;
+    }
+
+    .request-change-btn:hover {
+      background: linear-gradient(135deg, #d97706, #b45309);
+      transform: translateY(-50%) scale(1.02);
+    }
+
+    .request-change-btn:active {
+      transform: translateY(-50%) scale(0.98);
+    }
+
+    .session-row:hover .request-change-btn {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    /* Request Change Modal */
+    .request-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.6);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 15000;
+      padding: 16px;
+    }
+
+    .request-modal-overlay.hidden {
+      display: none;
+    }
+
+    .request-modal {
+      background: #fff;
+      border-radius: 20px;
+      width: min(92vw, 480px);
+      box-shadow: 0 24px 48px rgba(16, 24, 40, 0.3);
+      animation: request-pop 0.25s ease;
+      overflow: hidden;
+    }
+
+    @keyframes request-pop {
+      from { opacity: 0; transform: scale(0.95) translateY(10px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .request-modal-header {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #fff;
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .request-modal-header h3 {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .request-modal-close {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      color: #fff;
+      font-size: 16px;
+      transition: background 0.2s;
+    }
+
+    .request-modal-close:hover {
+      background: rgba(255,255,255,0.3);
+    }
+
+    .request-modal-body {
+      padding: 24px;
+    }
+
+    .request-session-info {
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 20px;
+    }
+
+    .request-session-info .info-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: #374151;
+    }
+
+    .request-session-info .info-row + .info-row {
+      margin-top: 8px;
+    }
+
+    .request-session-info .info-row i {
+      width: 20px;
+      text-align: center;
+      color: #6b7280;
+    }
+
+    .request-session-info .info-label {
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .request-textarea-wrap {
+      margin-bottom: 8px;
+    }
+
+    .request-textarea-wrap label {
+      display: block;
+      font-weight: 600;
+      font-size: 14px;
+      color: #374151;
+      margin-bottom: 8px;
+    }
+
+    .request-textarea {
+      width: 100%;
+      min-height: 120px;
+      padding: 14px;
+      border: 2px solid #e5e7eb;
+      border-radius: 12px;
+      font-size: 14px;
+      font-family: inherit;
+      resize: vertical;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .request-textarea:focus {
+      outline: none;
+      border-color: #f59e0b;
+      box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.15);
+    }
+
+    .request-textarea::placeholder {
+      color: #9ca3af;
+    }
+
+    .request-hint {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 8px;
+    }
+
+    .request-modal-footer {
+      padding: 16px 24px 24px;
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    }
+
+    .request-modal-footer button {
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.05s;
+    }
+
+    .request-cancel-btn {
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      color: #374151;
+    }
+
+    .request-cancel-btn:hover {
+      background: #e5e7eb;
+    }
+
+    .request-submit-btn {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      border: none;
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .request-submit-btn:hover {
+      box-shadow: 0 6px 16px rgba(245, 158, 11, 0.4);
+    }
+
+    .request-submit-btn:active {
+      transform: translateY(1px);
+    }
+
+.request-submit-btn:active {
+      transform: translateY(1px);
+    }
+
+    /* Success Toast */
+    #successToast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20000;
+      animation: toast-slide-up 0.3s ease;
+    }
+
+    #successToast.fade-out {
+      animation: toast-fade-out 0.3s ease forwards;
+    }
+
+    .success-toast {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 24px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #fff;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 14px;
+      box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4);
+    }
+
+    .success-toast i {
+      font-size: 18px;
+    }
+
+    @keyframes toast-slide-up {
+      from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+    }
+
+    @keyframes toast-fade-out {
+      from {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+      to {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+      }
+    }
+
+
+    /* Two-column layout */
+    .conf-columns {
+      display: flex;
+      gap: 24px;
+      align-items: flex-start;
+    }
+
+    .conf-col-left {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .conf-col-right {
+      flex: 1;
+      min-width: 0;
+    }
+
+    @media (max-width: 900px) {
+      .conf-columns {
+        flex-direction: column;
+      }
+    }
+
+    /* My Students section */
+    .ms-section {
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 4px 20px rgba(16, 24, 40, 0.06);
+      overflow: hidden;
+      margin-bottom: 24px;
+      border: 1px solid #f1f5f9;
+    }
+
+    .ms-section-head {
+      padding: 18px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: #fff;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .ms-section-head h2 {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .ms-section-badge {
+      margin-left: auto;
+      padding: 4px 14px;
+      background: rgba(255, 255, 255, 0.22);
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
+    .ms-section-chevron {
+      margin-left: 8px;
+      transition: transform 0.2s;
+    }
+
+    .ms-section.collapsed .ms-section-body {
+      display: none;
+    }
+
+    .ms-section.collapsed .ms-section-chevron {
+      transform: rotate(-90deg);
+    }
+
+    .ms-section-body {
+      padding: 16px 20px;
+    }
+
+    .ms-section-body.ms-empty {
+      text-align: center;
+      padding: 40px 20px;
+      color: #9ca3af;
+      font-style: italic;
+    }
+
+    .ms-description {
+      padding: 14px 20px;
+      margin: 0;
+      font-size: 0.82rem;
+      line-height: 1.6;
+      color: #6b7280;
+      background: #f0f7ff;
+      border-bottom: 1px solid #dbeafe;
+    }
+
+    .ms-description i {
+      color: #3b82f6;
+      margin-right: 4px;
+    }
+
+    .ms-day {
+      margin-bottom: 14px;
+      border: 1px solid #f1f5f9;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    .ms-day:last-child {
+      margin-bottom: 0;
+    }
+
+    .ms-day-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      background: #eff6ff;
+      border-bottom: 1px solid #dbeafe;
+    }
+
+    .ms-day-dow {
+      font-weight: 800;
+      font-size: 0.82rem;
+      padding: 3px 10px;
+      border-radius: 6px;
+      background: #dbeafe;
+      color: #2563eb;
+    }
+
+    .ms-day-date {
+      font-weight: 600;
+      font-size: 0.88rem;
+      color: #374151;
+    }
+
+    .ms-day-count {
+      margin-left: auto;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #6b7280;
+    }
+
+    .ms-student {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      border-bottom: 1px solid #f9fafb;
+      transition: background 0.12s;
+    }
+
+    .ms-student:last-child {
+      border-bottom: none;
+    }
+
+    .ms-student:hover {
+      background: #f0f7ff;
+    }
+
+    .ms-student-avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: #fff;
+      font-size: 0.7rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .ms-student-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .ms-student-name {
+      font-weight: 600;
+      font-size: 0.88rem;
+      color: #111827;
+    }
+
+    .ms-student-role {
+      display: inline-flex;
+      align-items: center;
+      margin-left: 6px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 0.65rem;
+      font-weight: 700;
+    }
+
+    .ms-role-ttkb {
+      background: #dbeafe;
+      color: #2563eb;
+      border: 1px solid #bfdbfe;
+    }
+
+    .ms-role-breakout {
+      background: #ede9fe;
+      color: #7c3aed;
+      border: 1px solid #c4b5fd;
+    }
+
+    .ms-student-time {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: #dbeafe;
+      color: #1e40af;
+      border: 1px solid #bfdbfe;
+    }
+
+    .ms-confirm-row {
+      padding: 14px 20px;
+      border-top: 1px solid #e5e7eb;
+      background: #f8fafc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ms-confirm-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+
+    .ms-confirm-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+    }
+
+    .ms-confirm-btn:disabled {
+      cursor: default;
+      transform: none;
+    }
+
+    .ms-confirm-btn.confirmed {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3);
+    }
+
+    .ms-confirm-btn.confirmed:hover {
+      transform: none;
+      box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3);
+    }
+
+
+    /* Loading state */
+    
+    /* Loading state */
+    .calendar-loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 60px 20px;
+      color: #6b7280;
+    }
+
+    .calendar-loading i {
+      font-size: 24px;
+      animation: spin 1s linear infinite;
+    }
+
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+      .week-calendar-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+
+      .day-card {
+        flex-direction: row;
+        align-items: center;
+        min-height: auto;
+        padding: 14px 16px;
+        gap: 16px;
+      }
+
+      .day-card-header {
+        margin-bottom: 0;
+        min-width: 60px;
+      }
+
+      .day-sessions {
+        margin-top: 0;
+        flex-direction: row;
+        flex-wrap: wrap;
+        margin-left: auto;
+      }
+
+      .day-date {
+        font-size: 20px;
+      }
+    }
+
+    /* Confirm FAB Button */
+    
+
+/* Student Note Modal */
+    .sn-modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 2000;
+      backdrop-filter: blur(4px);
+    }
+    .sn-modal {
+      display: none;
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      background: #fff;
+      border-radius: 20px;
+      width: min(460px, 92vw);
+      max-height: 85vh;
+      overflow-y: auto;
+      z-index: 2001;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+    .sn-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 24px;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #fff;
+      border-radius: 20px 20px 0 0;
+    }
+    .sn-modal-header h3 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .sn-modal-close {
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 1.2rem;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 8px;
+      transition: background 0.15s;
+    }
+    .sn-modal-close:hover {
+      background: rgba(255,255,255,0.2);
+    }
+    .sn-modal-body {
+      padding: 20px 24px;
+    }
+    .sn-student-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 12px;
+      margin-bottom: 16px;
+    }
+    .sn-student-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #fff;
+      font-size: 0.8rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .sn-student-detail {
+      flex: 1;
+    }
+    .sn-student-detail strong {
+      display: block;
+      font-size: 0.95rem;
+      color: #111827;
+    }
+    .sn-student-detail small {
+      font-size: 0.78rem;
+      color: #6b7280;
+    }
+    .sn-existing-notes {
+      margin-bottom: 16px;
+    }
+    .sn-existing-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #6b7280;
+      margin-bottom: 8px;
+    }
+    .sn-note-item {
+      padding: 10px 14px;
+      background: #fef3c7;
+      border: 1px solid #fde68a;
+      border-radius: 10px;
+      margin-bottom: 8px;
+      font-size: 0.82rem;
+    }
+    .sn-note-item .sn-note-text {
+      color: #92400e;
+      font-weight: 500;
+    }
+    .sn-note-item .sn-note-meta {
+      font-size: 0.7rem;
+      color: #9ca3af;
+      margin-top: 4px;
+    }
+    .sn-note-item .sn-note-status {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 0.65rem;
+      font-weight: 700;
+    }
+    .sn-note-status.pending { background: #fef3c7; color: #92400e; }
+    .sn-note-status.resolved { background: #d1fae5; color: #065f46; }
+    .sn-note-status.rejected { background: #fee2e2; color: #991b1b; }
+    .sn-textarea {
+      width: 100%;
+      min-height: 100px;
+      border: 2px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 0.88rem;
+      font-family: inherit;
+      resize: vertical;
+      transition: border-color 0.2s;
+      box-sizing: border-box;
+    }
+    .sn-textarea:focus {
+      outline: none;
+      border-color: #f59e0b;
+    }
+    .sn-hint {
+      font-size: 0.75rem;
+      color: #9ca3af;
+      margin-top: 6px;
+    }
+    .sn-modal-footer {
+      display: flex;
+      gap: 10px;
+      padding: 16px 24px;
+      border-top: 1px solid #f1f5f9;
+      justify-content: flex-end;
+    }
+    .sn-cancel-btn {
+      padding: 10px 20px;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      background: #fff;
+      color: #374151;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .sn-submit-btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .sn-submit-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
+    }
+    .sn-submit-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .ms-student-note-icon {
+      cursor: pointer;
+      color: #d97706;
+      font-size: 0.8rem;
+      margin-left: 4px;
+      opacity: 0.5;
+      transition: opacity 0.15s;
+    }
+    .ms-student:hover .ms-student-note-icon {
+      opacity: 1;
+    }
+    .ms-student-has-note {
+      background: #fffbeb;
+      border-left: 3px solid #f59e0b;
+    }
+    .ms-student-note-preview {
+      font-size: 0.72rem;
+      color: #92400e;
+      margin-top: 2px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+/* ===== UNIFIED CONFIRMATION STEPPER ===== */
+    .conf-stepper {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      background: #fff;
+      border-top: 1px solid #e5e7eb;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
+      padding: 14px 24px;
+      display: none;
+    }
+
+    .conf-stepper.visible { display: block; }
+
+    .conf-stepper-inner {
+      max-width: 1800px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .conf-step {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-radius: 14px;
+      border: 2px solid #e5e7eb;
+      background: #fafbfc;
+      cursor: pointer;
+      transition: all 0.25s;
+      position: relative;
+    }
+
+    .conf-step:hover:not(.done) {
+      border-color: #3b82f6;
+      background: #eff6ff;
+    }
+
+    .conf-step.done {
+      border-color: #22c55e;
+      background: #f0fdf4;
+      cursor: default;
+    }
+
+    .conf-step.active-step {
+      border-color: #3b82f6;
+      background: #eff6ff;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    }
+
+    .conf-step-num {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      flex-shrink: 0;
+      background: #e5e7eb;
+      color: #6b7280;
+      transition: all 0.25s;
+    }
+
+    .conf-step.done .conf-step-num {
+      background: #22c55e;
+      color: #fff;
+    }
+
+    .conf-step.active-step .conf-step-num {
+      background: #3b82f6;
+      color: #fff;
+    }
+
+    .conf-step-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .conf-step-label {
+      font-weight: 700;
+      font-size: 13px;
+      color: #0f172a;
+      margin-bottom: 2px;
+    }
+
+    .conf-step-status {
+      font-size: 12px;
+      color: #94a3b8;
+      font-weight: 500;
+    }
+
+    .conf-step.done .conf-step-status {
+      color: #16a34a;
+    }
+
+    .conf-step-arrow {
+      color: #d1d5db;
+      font-size: 14px;
+      flex-shrink: 0;
+      margin: 0 -2px;
+    }
+
+    .conf-stepper-progress {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: 16px;
+      flex-shrink: 0;
+    }
+
+    .conf-progress-text {
+      font-size: 13px;
+      font-weight: 700;
+      color: #64748b;
+      white-space: nowrap;
+    }
+
+    .conf-progress-text.all-done {
+      color: #16a34a;
+    }
+
+    .conf-stepper.all-confirmed {
+      border-top-color: #bbf7d0;
+      background: linear-gradient(180deg, #f0fdf4, #fff);
+    }
+
+    /* Confirmation Popup */
+    .conf-popup-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.55);
+      backdrop-filter: blur(4px);
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .conf-popup-overlay.show {
+      display: flex;
+    }
+
+    .conf-popup {
+      background: #fff;
+      border-radius: 20px;
+      padding: 32px 28px 24px;
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+      animation: confPopupIn 0.25s ease-out;
+    }
+
+    @keyframes confPopupIn {
+      from { transform: scale(0.9); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .conf-popup-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      font-size: 24px;
+    }
+
+    .conf-popup-icon.step-freehours {
+      background: #eef2ff;
+      color: #4f46e5;
+    }
+
+    .conf-popup-icon.step-schedule {
+      background: #ecfdf5;
+      color: #059669;
+    }
+
+    .conf-popup-icon.step-students {
+      background: #fff7ed;
+      color: #d97706;
+    }
+
+    .conf-popup-title {
+      margin: 0 0 8px;
+      font-size: 18px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .conf-popup-msg {
+      margin: 0 0 24px;
+      font-size: 14px;
+      color: #64748b;
+      line-height: 1.6;
+    }
+
+    .conf-popup-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .conf-popup-cancel {
+      padding: 12px 24px;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      background: #fff;
+      color: #374151;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .conf-popup-cancel:hover {
+      background: #f3f4f6;
+    }
+
+    .conf-popup-ok {
+      padding: 12px 28px;
+      border-radius: 12px;
+      border: none;
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: #fff;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.15s;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+
+    .conf-popup-ok:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+    }
+
+    
+    @media (max-width: 768px) {
+      .conf-stepper-inner {
+        flex-direction: column;
+        gap: 8px;
+      }
+      .conf-step {
+        width: 100%;
+      }
+      .conf-step-arrow {
+        display: none;
+      }
+      .conf-stepper-progress {
+        margin-left: 0;
+        width: 100%;
+        justify-content: center;
+        padding-top: 4px;
+      }
+    }
+
+/* ===== FREE HOURS SECTION ===== */
+    .free-hours-section {
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 4px 20px rgba(16, 24, 40, 0.08);
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+
+    .free-hours-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 20px 24px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .free-hours-header .fh-icon {
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #6366f1, #4f46e5);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 16px;
+    }
+
+    .free-hours-header h2 {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .free-hours-header .fh-total {
+      margin-left: auto;
+      font-size: 13px;
+      font-weight: 600;
+      color: #64748b;
+      padding: 4px 12px;
+      background: #f1f5f9;
+      border-radius: 9999px;
+    }
+
+    .free-hours-body {
+      padding: 20px 24px;
+    }
+
+    .fh-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+    }
+
+    .fh-col {
+      background: #fff;
+      border: 1px solid #f1f5f9;
+      border-radius: 12px;
+      overflow: hidden;
+      min-height: 90px;
+    }
+
+    .fh-col-head {
+      padding: 8px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .fh-col-body {
+      padding: 8px 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .fh-pill {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 8px;
+      border-radius: 8px;
+      text-align: center;
+      line-height: 1.3;
+    }
+
+    .fh-col.fh-empty-day { opacity: 0.4; }
+    .fh-no-slot {
+      font-size: 12px;
+      color: #94a3b8;
+      text-align: center;
+      padding: 16px 4px;
+    }
+
+    .fh-empty-msg {
+      text-align: center;
+      padding: 32px 20px;
+      color: #94a3b8;
+      font-size: 14px;
+    }
+
+    .fh-empty-msg i {
+      display: block;
+      font-size: 2rem;
+      margin-bottom: 8px;
+      color: #cbd5e1;
+    }
+
+    /* Day colors */
+    .fh-col.day-mon .fh-col-head { background: #eff6ff; color: #1d4ed8; }
+    .fh-col.day-mon .fh-pill { background: #dbeafe; color: #1e40af; }
+
+    .fh-col.day-tue .fh-col-head { background: #ecfdf5; color: #047857; }
+    .fh-col.day-tue .fh-pill { background: #d1fae5; color: #065f46; }
+
+    .fh-col.day-wed .fh-col-head { background: #fffbeb; color: #b45309; }
+    .fh-col.day-wed .fh-pill { background: #fef3c7; color: #92400e; }
+
+    .fh-col.day-thu .fh-col-head { background: #f5f3ff; color: #6d28d9; }
+    .fh-col.day-thu .fh-pill { background: #ede9fe; color: #5b21b6; }
+
+    .fh-col.day-fri .fh-col-head { background: #fff1f2; color: #be123c; }
+    .fh-col.day-fri .fh-pill { background: #fce7f3; color: #9d174d; }
+
+    .fh-col.day-sat .fh-col-head { background: #ecfeff; color: #0e7490; }
+    .fh-col.day-sat .fh-pill { background: #cffafe; color: #155e75; }
+
+    .fh-col.day-sun .fh-col-head { background: #fff7ed; color: #c2410c; }
+    .fh-col.day-sun .fh-pill { background: #ffedd5; color: #9a3412; }
+
+    @media (max-width: 720px) {
+      .fh-grid { grid-template-columns: repeat(4, 1fr); }
+    }
+    @media (max-width: 480px) {
+      .fh-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+
+
+  </style>
+</head>
+
+<body>
+  <!-- Login Card (same as other pages) -->
+  <div class="card" id="loginCard">
+    <div class="logo">Meetings</div>
+    <div class="subtitle">Đăng nhập bằng email &amp; mật khẩu của bạn</div>
+
+    <div class="field">
+      <input id="email" type="email" autocomplete="username" placeholder="Email" required />
+    </div>
+
+    <div class="field">
+      <input id="password" type="password" autocomplete="current-password" placeholder="Mật khẩu" required />
+      <button class="toggle-password" id="togglePwd" aria-label="Hiện/ẩn mật khẩu">👁️</button>
+    </div>
+
+    <button class="btn" id="login">Đăng nhập</button>
+    <div id="message" aria-live="polite"></div>
+  </div>
+
+  <!-- Sidebar Toggle Button -->
+  <button class="sidebar-toggle" id="sidebarToggle" style="display:none;">
+    <i class="fa-solid fa-bars"></i>
+  </button>
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <i class="fa-solid fa-chalkboard-user"></i> Meetings
+      </div>
+      <button class="sidebar-close" id="sidebarClose">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+    <nav class="sidebar-nav">
+      <a class="sidebar-link" href="./index.html"><i class="fa-solid fa-calendar-days"></i><span>Lịch làm việc</span></a>
+      <a class="sidebar-link active" href="./confirmation.html"><i class="fa-solid fa-calendar-check"></i><span>Xác nhận lịch & HV</span></a>
+      <a class="sidebar-link" href="./offteachers.html"><i class="fa-solid fa-user-slash"></i><span>GV nghỉ / Thay thế</span></a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="sidebar-logout" id="sidebarLogout">
+        <i class="fa-solid fa-right-from-bracket"></i><span>Đăng xuất</span>
+      </button>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <!-- Main Content (hidden until logged in) -->
+  <div class="confirmation-container" id="mainContent" style="display: none;">
+    
+    <!-- Header -->
+    <div class="confirmation-header">
+      <div class="confirmation-title">
+        <i class="fa-solid fa-calendar-check"></i>
+        <h1>Xác nhận lịch & danh sách HV</h1>
+      </div>
+      
+    </div>
+
+    <!-- Free Hours Section (full width, above columns) -->
+    <section class="free-hours-section">
+      <div class="free-hours-header">
+        <div class="fh-icon"><i class="fa-solid fa-clock"></i></div>
+        <h2>Giờ rảnh hiện tại</h2>
+        <span class="fh-total" id="fhTotal"></span>
+      </div>
+      <div class="free-hours-body">
+        <div id="freeHoursGrid">
+          <div class="calendar-loading">
+            <i class="fa-solid fa-spinner"></i>
+            <span>Đang tải giờ rảnh...</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="conf-columns">
+      <div class="conf-col-left">
+    <!-- Calendar Section -->
+    <section class="calendar-section">
+      <div class="calendar-section-header">
+        <h2><i class="fa-regular fa-calendar"></i> Lịch tuần này</h2>
+        <div class="week-range-badge" id="weekRangeBadge">
+          <i class="fa-solid fa-calendar-days"></i>
+          <span id="weekRangeText">--/-- – --/--</span>
+        </div>
+      </div>
+      <div class="calendar-section-body">
+        <div id="calendarGrid" class="week-calendar-grid">
+          <div class="calendar-loading">
+            <i class="fa-solid fa-spinner"></i>
+            <span>Đang tải lịch...</span>
+          </div>
+        </div>
+        <div class="stats-bar" id="statsBar" style="display: none;">
+          <div class="stat-item stat-total">
+            <i class="fa-solid fa-calendar-check"></i>
+            <span id="totalSessions">0 buổi làm việc</span>
+          </div>
+          <div class="stat-item stat-hours">
+            <i class="fa-solid fa-clock"></i>
+            <span id="totalHours">0 giờ</span>
+          </div>
+        </div>
+      </div>
+</section>
+
+    </div>
+
+      <div class="conf-col-right">
+        <div id="myStudentsContent">
+          <div class="calendar-loading">
+            <i class="fa-solid fa-spinner"></i>
+            <span>Đang tải danh sách HV...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Student Note Modal -->
+    <div class="sn-modal-overlay" id="snOverlay"></div>
+    <div class="sn-modal" id="snModal">
+      <div class="sn-modal-header">
+        <h3><i class="fa-solid fa-flag"></i> Ghi chú / Báo cáo về HV</h3>
+        <button class="sn-modal-close" id="snClose"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="sn-modal-body">
+        <div class="sn-student-info" id="snStudentInfo"></div>
+        <div class="sn-existing-notes" id="snExistingNotes"></div>
+        <label style="font-size:0.82rem;font-weight:600;color:#374151;display:block;margin-bottom:6px;">
+          <i class="fa-solid fa-pen"></i> Nội dung ghi chú:
+        </label>
+        <textarea class="sn-textarea" id="snTextarea" placeholder="VD: HV này không thuộc nhóm tôi phụ trách, hoặc giờ tiếp HV bị sai..."></textarea>
+        <p class="sn-hint"><i class="fa-solid fa-circle-info"></i> Ghi chú sẽ được gửi đến quản lý để xem xét.</p>
+      </div>
+      <div class="sn-modal-footer">
+        <button class="sn-cancel-btn" id="snCancelBtn">Hủy</button>
+        <button class="sn-submit-btn" id="snSubmitBtn">
+          <i class="fa-solid fa-paper-plane"></i> Gửi ghi chú
+        </button>
+      </div>
+    </div>
+
+<!-- Confirmation Popup -->
+    <div class="conf-popup-overlay" id="confPopupOverlay">
+      <div class="conf-popup">
+        <div class="conf-popup-icon" id="confPopupIcon">
+          <i class="fa-solid fa-circle-question"></i>
+        </div>
+        <h3 class="conf-popup-title" id="confPopupTitle">Xác nhận</h3>
+        <p class="conf-popup-msg" id="confPopupMsg">Bạn có chắc chắn muốn xác nhận?</p>
+        <div class="conf-popup-actions">
+          <button class="conf-popup-cancel" id="confPopupCancel">Hủy</button>
+          <button class="conf-popup-ok" id="confPopupOk">
+            <i class="fa-solid fa-check"></i> Tôi xác nhận
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Unified Confirmation Stepper -->
+    <div class="conf-stepper" id="confStepper">
+      <div class="conf-stepper-inner">
+
+        <div class="conf-step" id="confStep1" data-step="freehours">
+          <div class="conf-step-num" id="confStepNum1">1</div>
+          <div class="conf-step-info">
+            <div class="conf-step-label">Giờ rảnh</div>
+            <div class="conf-step-status" id="confStepStatus1">Chưa xác nhận</div>
+          </div>
+        </div>
+
+        <i class="fa-solid fa-chevron-right conf-step-arrow"></i>
+
+        <div class="conf-step" id="confStep2" data-step="schedule">
+          <div class="conf-step-num" id="confStepNum2">2</div>
+          <div class="conf-step-info">
+            <div class="conf-step-label">Lịch làm việc</div>
+            <div class="conf-step-status" id="confStepStatus2">Chưa xác nhận</div>
+          </div>
+        </div>
+
+        <i class="fa-solid fa-chevron-right conf-step-arrow"></i>
+
+        <div class="conf-step" id="confStep3" data-step="students">
+          <div class="conf-step-num" id="confStepNum3">3</div>
+          <div class="conf-step-info">
+            <div class="conf-step-label">Danh sách HV</div>
+            <div class="conf-step-status" id="confStepStatus3">Chưa xác nhận</div>
+          </div>
+        </div>
+
+        <div class="conf-stepper-progress">
+          <span class="conf-progress-text" id="confProgressText">0 / 3</span>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+
+  <!-- Request Change Modal -->
+  <div class="request-modal-overlay hidden" id="requestChangeModal">
+    <div class="request-modal" role="dialog" aria-modal="true" aria-labelledby="requestModalTitle">
+      <div class="request-modal-header">
+        <h3 id="requestModalTitle">
+          <i class="fa-solid fa-pen-to-square"></i>
+          Yêu cầu thay đổi lịch
+        </h3>
+        <button class="request-modal-close" id="requestModalClose" aria-label="Đóng">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="request-modal-body">
+        <div class="request-session-info" id="requestSessionInfo">
+          <!-- Session info will be populated by JS -->
+        </div>
+        <div class="request-textarea-wrap">
+          <label for="requestReason">Lý do yêu cầu thay đổi <span style="color:#dc2626">*</span></label>
+          <textarea 
+            id="requestReason" 
+            class="request-textarea" 
+            placeholder="Vui lòng nhập lý do bạn muốn thay đổi lịch làm việc này..."
+          ></textarea>
+          <p class="request-hint">
+            <i class="fa-solid fa-info-circle"></i>
+            Yêu cầu sẽ được gửi đến quản lý để xem xét.
+          </p>
+        </div>
+      </div>
+      <div class="request-modal-footer">
+        <button class="request-cancel-btn" id="requestCancelBtn">Hủy</button>
+        <button class="request-submit-btn" id="requestSubmitBtn">
+          <i class="fa-solid fa-paper-plane"></i>
+          Gửi yêu cầu
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+</body>
+</html>
