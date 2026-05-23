@@ -25,17 +25,12 @@ module.exports = function(app) {
     for (const h of forward) {
       if (req.headers[h]) headers[h] = req.headers[h];
     }
-    // LOG: show what we're forwarding
-      console.log('[sb-proxy] auth header present:', !!headers['authorization']);
-      console.log('[sb-proxy] apikey present:', !!headers['apikey']);
-    }
     // --- CACHE: only GET requests for cacheable patterns ---
     if (req.method === 'GET') {
       const cacheInfo = getCacheKey(req.url, req.headers['accept']);
       if (cacheInfo) {
         const cached = await cache.get(cacheInfo.key);
         if (cached) {
-          }
           if (req.url.includes('quizzes')) {
             console.log('[sb-proxy] CACHE HIT for quizzes');
           }
@@ -67,8 +62,6 @@ module.exports = function(app) {
         }
       }
       const body = await response.text();
-      // LOG: show what Supabase returned
-      }
       // --- CACHE: store successful GET responses ---
       if (req.method === 'GET' && response.status >= 200 && response.status < 300) {
         const cacheInfo = getCacheKey(req.url, req.headers['accept']);
