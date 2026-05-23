@@ -3,7 +3,6 @@ module.exports = function(app) {
   const cache = require('./_cache-helper');
   // Cache config: only these GET query patterns are cached
   const CACHEABLE = [
-    { match: 'quizzes', ttl: 300 },
     { match: 'books_chapters', ttl: 3600 },
   ];
   function getCacheKey(url, acceptHeader) {
