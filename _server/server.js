@@ -11,6 +11,7 @@ app.use(express.json({ limit: '5mb' }));
 app.get('/health', (req, res) => res.json({ ok: true }));
 
 // Load routes
+require("./routes/sb-url-rewrite.system")(app);
 require('./routes/get-student-ttkb.baihoc')(app);
 require('./routes/ttkb-zalo-cron.baihoc')(app);
 require('./routes/room-size-batch.watch')(app);
@@ -182,6 +183,28 @@ require("./routes/quiz-submissions-list.quiz")(app);
 require("./routes/quiz-grant-extra-attempt.quiz")(app);
 require("./routes/quiz-submission-get.quiz")(app);
 require("./routes/quiz-presign-wasabi.quiz")(app);
+require("./routes/quiz-emergency-submit.quiz")(app);
+
+// --- Penalty Routes ---
+require("./routes/pen-credentials.penalty")(app);
+require("./routes/pen-get-penalty-data.penalty")(app);
+require("./routes/pen-get-tieu-chi.penalty")(app);
+require("./routes/pen-get-penalties.penalty")(app);
+require("./routes/pen-delete-penalty.penalty")(app);
+require("./routes/pen-delete-from-penalties.penalty")(app);
+
+// --- LamLaiForm Routes ---
+require("./routes/llf-credentials.lamlaiform")(app);
+
+// --- StudentSubmissions Routes ---
+require("./routes/ss-credentials.studentsubmissions")(app);
+require("./routes/ss-get-user-names.studentsubmissions")(app);
+require("./routes/ss-get-student-teachers.studentsubmissions")(app);
+require("./routes/ss-students-not-submitted-today.studentsubmissions")(app);
+require("./routes/ss-get-submission.studentsubmissions")(app);
+
+// --- HocPhi Routes ---
+require("./routes/hp-programs.hocphi")(app);
 
 // --- Screen Recorder Routes (migrated from Netlify) ---
 require("./routes/rec-credentials.recorder")(app);
@@ -524,6 +547,344 @@ require("./routes/frm-get-templates.forms")(app);
 require("./routes/frm-get-submissions.forms")(app);
 require("./routes/frm-delete-submission.forms")(app);
 require("./routes/frm-presign-wasabi.forms")(app);
+
+// --- Assistant Routes ---
+
+require("./routes/ast-supabase-credentials.assistant")(app);
+
+require("./routes/ast-ocr-vision.assistant")(app);
+
+require("./routes/ast-chat.assistant")(app);
+
+// --- Register Routes ---
+require("./routes/reg-signup.register")(app);
+
+// --- AssignDepartment Routes ---
+require("./routes/dept-credentials.assigndepartment")(app);
+require("./routes/dept-get-dashboard-data.assigndepartment")(app);
+require("./routes/dept-assign-department.assigndepartment")(app);
+require("./routes/dept-remove-department.assigndepartment")(app);
+
+// --- Zalo OA Collector Routes ---
+require("./routes/zalo-webhook.tszalo")(app);
+
+// --- DanhGiaGV Routes ---
+require("./routes/dg-credentials.danhgiagv")(app);
+require("./routes/dg-get-latest-assessments.danhgiagv")(app);
+require("./routes/dg-get-assessment-results.danhgiagv")(app);
+require("./routes/dg-save-assessment-result.danhgiagv")(app);
+require("./routes/dg-get-work-records.danhgiagv")(app);
+require("./routes/dg-get-assessment-history.danhgiagv")(app);
+require("./routes/dg-get-tieu-chi-by-type.danhgiagv")(app);
+require("./routes/dg-get-content-list.danhgiagv")(app);
+require("./routes/dg-save-content.danhgiagv")(app);
+require("./routes/dg-edit-content.danhgiagv")(app);
+require("./routes/dg-delete-content.danhgiagv")(app);
+require("./routes/dg-get-tieu-chi.danhgiagv")(app);
+require("./routes/dg-save-tieu-chi.danhgiagv")(app);
+require("./routes/dg-edit-tieu-chi.danhgiagv")(app);
+require("./routes/dg-delete-tieu-chi.danhgiagv")(app);
+
+// --- Translate Routes ---
+require("./routes/trl-supabase-credentials.translate")(app);
+require("./routes/trl-translate.translate")(app);
+require("./routes/trl-tts.translate")(app);
+require("./routes/trl-vision-ocr.translate")(app);
+require("./routes/trl-deepgram-transcribe.translate")(app);
+
+// --- TimedCheck Routes ---
+require("./routes/tck-supabase-credentials.timedcheck")(app);
+require("./routes/tck-get-user-role.timedcheck")(app);
+require("./routes/tck-save-test.timedcheck")(app);
+require("./routes/tck-get-user-tests.timedcheck")(app);
+require("./routes/tck-get-test.timedcheck")(app);
+require("./routes/tck-delete-test.timedcheck")(app);
+require("./routes/tck-update-test-time.timedcheck")(app);
+
+// --- Homepage Routes ---
+require("./routes/hp-supabase-credentials.homepage")(app);
+
+// --- Speaking Routes ---
+
+require("./routes/spk-supabase-credentials.speaking")(app);
+
+require("./routes/spk-get-speaking.speaking")(app);
+
+require("./routes/spk-get-user-speakings.speaking")(app);
+
+require("./routes/spk-save-speaking.speaking")(app);
+
+require("./routes/spk-update-speaking.speaking")(app);
+
+require("./routes/spk-delete-speaking.speaking")(app);
+
+require("./routes/spk-get-submission.speaking")(app);
+
+require("./routes/spk-get-all-submissions.speaking")(app);
+
+require("./routes/spk-delete-submission.speaking")(app);
+
+require("./routes/spk-start-grading.speaking")(app);
+
+require("./routes/spk-get-grading-status.speaking")(app);
+
+require("./routes/spk-get-grading-by-submission.speaking")(app);
+
+require("./routes/spk-grade-speaking-background.speaking")(app);
+
+require("./routes/spk-grade-writing.speaking")(app);
+
+require("./routes/spk-grade-transcript.speaking")(app);
+
+require("./routes/spk-grade-transcript-background.speaking")(app);
+
+require("./routes/spk-get-transcript-status.speaking")(app);
+
+require("./routes/spk-get-transcription-status.speaking")(app);
+
+require("./routes/spk-start-transcription.speaking")(app);
+
+require("./routes/spk-transcription-background.speaking")(app);
+
+require("./routes/spk-get-your-speech.speaking")(app);
+
+require("./routes/spk-presign-wasabi.speaking")(app);
+
+require("./routes/spk-start-multipart-upload.speaking")(app);
+
+require("./routes/spk-get-part-url.speaking")(app);
+
+require("./routes/spk-complete-multipart-upload.speaking")(app);
+
+require("./routes/spk-list-parts.speaking")(app);
+
+require("./routes/spk-abort-multipart-upload.speaking")(app);
+
+require("./routes/spk-update-submission-zalo.speaking")(app);
+require("./routes/spk-get-prompt.speaking")(app);
+require("./routes/spk-save-prompt.speaking")(app);
+require("./routes/spk-save-complaint.speaking")(app);
+require("./routes/spk-save-homework-content.speaking")(app);
+require("./routes/spk-update-homework-status.speaking")(app);
+require("./routes/spk-send-zalo.speaking")(app);
+
+// --- Speech Routes ---
+
+require("./routes/spc-supabase-credentials.speech")(app);
+
+require("./routes/spc-get-speech-content.speech")(app);
+
+require("./routes/spc-get-your-speech.speech")(app);
+
+require("./routes/spc-presign-wasabi.speech")(app);
+
+require("./routes/spc-processing-correctness.speech")(app);
+
+require("./routes/spc-save-speech-content.speech")(app);
+
+require("./routes/spc-save-speech-submission.speech")(app);
+
+// --- ReadText Routes ---
+
+require("./routes/rt-supabase-credentials.readtext")(app);
+
+require("./routes/rt-ping.readtext")(app);
+
+require("./routes/rt-job-status.readtext")(app);
+
+require("./routes/rt-recent-tts.readtext")(app);
+
+require("./routes/rt-recent-tts-list.readtext")(app);
+
+require("./routes/rt-speak.readtext")(app);
+
+require("./routes/rt-speak-background.readtext")(app);
+
+require("./routes/rt-voices.readtext")(app);
+
+// --- Task Routes ---
+
+require("./routes/tsk-supabase-credentials.task")(app);
+
+require("./routes/tsk-departments.task")(app);
+
+require("./routes/tsk-teachers.task")(app);
+
+require("./routes/tsk-task-delete.task")(app);
+
+require("./routes/tsk-task-update.task")(app);
+
+require("./routes/tsk-update-teacher-max-sessions.task")(app);
+
+require("./routes/tsk-work-tasks-calendar.task")(app);
+
+require("./routes/tsk-work-tasks-individual.task")(app);
+
+require("./routes/tsk-work-tasks-tags.task")(app);
+
+require("./routes/tsk-work-tasks-tags-delete.task")(app);
+
+require("./routes/tsk-work-tasks-tags-list.task")(app);
+
+require("./routes/tsk-work-tasks-teacher-assignments.task")(app);
+
+// --- StudentVideo Routes ---
+
+require("./routes/sv-supabase-credentials.studentvideo")(app);
+
+require("./routes/sv-get-approved-videos.studentvideo")(app);
+
+require("./routes/sv-get-marking-criteria.studentvideo")(app);
+
+require("./routes/sv-get-topic.studentvideo")(app);
+
+require("./routes/sv-get-tracking-students.studentvideo")(app);
+
+require("./routes/sv-get-videos.studentvideo")(app);
+
+require("./routes/sv-presign-wasabi.studentvideo")(app);
+
+require("./routes/sv-save-marking-result.studentvideo")(app);
+
+require("./routes/sv-send-zalo.studentvideo")(app);
+
+require("./routes/sv-submit-video.studentvideo")(app);
+
+// --- VideoMakingTask Routes ---
+
+require("./routes/vmt-supabase-credentials.videomakingtask")(app);
+
+require("./routes/vmt-create-topic.videomakingtask")(app);
+
+require("./routes/vmt-delete-task.videomakingtask")(app);
+
+require("./routes/vmt-get-criteria.videomakingtask")(app);
+
+require("./routes/vmt-get-tasks.videomakingtask")(app);
+
+require("./routes/vmt-presign-wasabi.videomakingtask")(app);
+
+require("./routes/vmt-save-criteria.videomakingtask")(app);
+
+require("./routes/vmt-update-task.videomakingtask")(app);
+
+// --- TrainingManagement Routes ---
+
+require("./routes/tm-supabase-credentials.trainingmanagement")(app);
+
+require("./routes/tm-get-departments.trainingmanagement")(app);
+
+require("./routes/tm-get-trainees.trainingmanagement")(app);
+
+require("./routes/tm-search-users.trainingmanagement")(app);
+
+require("./routes/tm-save-trainee.trainingmanagement")(app);
+
+require("./routes/tm-update-trainee.trainingmanagement")(app);
+
+require("./routes/tm-delete-trainee.trainingmanagement")(app);
+
+require("./routes/tm-save-training-session.trainingmanagement")(app);
+
+require("./routes/tm-save-training-comment.trainingmanagement")(app);
+
+require("./routes/tm-delete-training-comment.trainingmanagement")(app);
+
+require("./routes/tm-assign-handler.trainingmanagement")(app);
+
+// --- Feedback Routes ---
+
+require("./routes/fb-supabase-credentials.feedback")(app);
+
+require("./routes/fb-check-role.feedback")(app);
+
+require("./routes/fb-save-question.feedback")(app);
+
+require("./routes/fb-delete-question.feedback")(app);
+
+require("./routes/fb-load-responses.feedback")(app);
+
+require("./routes/fb-presign-teacher-image.feedback")(app);
+
+require("./routes/fb-save-feedback-response.feedback")(app);
+
+require("./routes/fb-students-learning-today.feedback")(app);
+
+require("./routes/fb-teacher-rating.feedback")(app);
+
+require("./routes/fb-update-question-order.feedback")(app);
+
+// --- TeachersAndStudents Routes ---
+
+require("./routes/tas-supabase-credentials.teachersandstudents")(app);
+
+require("./routes/tas-teachers-list.teachersandstudents")(app);
+
+// --- LevelAssignment Routes ---
+
+require("./routes/la-supabase-credentials.levelassignment")(app);
+
+require("./routes/la-dashboard-data.levelassignment")(app);
+
+require("./routes/la-manage-assignment.levelassignment")(app);
+
+require("./routes/la-update-department.levelassignment")(app);
+
+// --- DemoManagement Routes ---
+require("./routes/dm-supabase-credentials.demomanagement")(app);
+require("./routes/dm-get-students.demomanagement")(app);
+require("./routes/dm-get-classes.demomanagement")(app);
+require("./routes/dm-save-student.demomanagement")(app);
+require("./routes/dm-update-student.demomanagement")(app);
+require("./routes/dm-delete-student.demomanagement")(app);
+require("./routes/dm-delete-comment.demomanagement")(app);
+require("./routes/dm-save-comment.demomanagement")(app);
+require("./routes/dm-search-users.demomanagement")(app);
+require("./routes/dm-assign-student.demomanagement")(app);
+
+// --- ZaloTracker Routes ---
+require("./routes/zt-supabase-credentials.zalotracker")(app);
+require("./routes/zt-search-users.zalotracker")(app);
+require("./routes/zt-add-student-contact.zalotracker")(app);
+require("./routes/zt-delete-student-contact.zalotracker")(app);
+require("./routes/zt-update-student-contact.zalotracker")(app);
+require("./routes/zt-whoami-role.zalotracker")(app);
+require("./routes/zt-zaloids.zalotracker")(app);
+
+// --- UserRole Routes ---
+require("./routes/ur-verify-security-key.userrole")(app);
+require("./routes/ur-delete-user.userrole")(app);
+require("./routes/ur-update-name.userrole")(app);
+require("./routes/ur-update-role.userrole")(app);
+
+// --- StudentCodes Routes ---
+require("./routes/sc-supabase-credentials.studentcodes")(app);
+require("./routes/sc-verify-security-key.studentcodes")(app);
+require("./routes/sc-search-emails.studentcodes")(app);
+require("./routes/sc-get-code.studentcodes")(app);
+require("./routes/sc-save-codes.studentcodes")(app);
+require("./routes/sc-presign-wasabi.studentcodes")(app);
+require("./routes/sc-get-logs.studentcodes")(app);
+require("./routes/sc-get-low-stock.studentcodes")(app);
+require("./routes/sc-get-missing-students.studentcodes")(app);
+
+// --- SecurityKey Routes ---
+require("./routes/sk-supabase-credentials.securitykey")(app);
+require("./routes/sk-admin-api.securitykey")(app);
+require("./routes/sk-auto-key-generator.securitykey")(app);
+
+// --- Monitor Routes ---
+require("./routes/mon-status.monitor")(app);
+require("./routes/mon-auth.monitor")(app);
+require("./routes/mon-banned.monitor")(app);
+require("./routes/mon-cron.monitor")(app);
+require("./routes/mon-backups.monitor")(app);
+require("./routes/mon-cache.monitor")(app);
+
+// --- Supabase Proxy ---
+require("./routes/sb-proxy.system")(app);
+require("./routes/mon-latency.monitor")(app);
+require("./routes/mon-zalo-alert.monitor")(app);
 app.listen(PORT, () => {
   console.log('API server running on port ' + PORT);
 });
@@ -535,3 +896,6 @@ require("./routes/alert-get-missing-submissions.alert")(app);
 require("./routes/alert-get-ttkb-content.alert")(app);
 require("./routes/alert-get-submission-content.alert")(app);
 require("./routes/alert-check-ttkb.alert")(app);
+// --- TeacherCodes App Routes ---
+require("./routes/tc-get-code.teachercodes")(app);
+require("./routes/tc-upload-image.teachercodes")(app);

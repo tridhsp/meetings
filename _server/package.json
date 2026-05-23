@@ -13,13 +13,16 @@
     "@aws-sdk/client-s3": "^3.1045.0",
     "@aws-sdk/client-ses": "^3.1048.0",
     "@aws-sdk/s3-request-presigner": "^3.1045.0",
+    "@google-cloud/text-to-speech": "^6.4.1",
     "@supabase/supabase-js": "^2.105.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "google-auth-library": "^10.6.2",
+    "ioredis": "^5.10.1",
     "node-fetch": "^3.3.2",
     "pg": "^8.20.0",
+    "uuid": "^14.0.0",
     "ws": "^8.20.0"
   }
 }
