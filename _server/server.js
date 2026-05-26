@@ -887,6 +887,7 @@ require("./routes/mon-cache.monitor")(app);
 
 // --- Supabase Proxy ---
 // REMOVED Phase7: require("./routes/sb-proxy.system")(app);
+require("./routes/db-gate.system")(app);
 require("./routes/mon-latency.monitor")(app);
 require("./routes/mon-zalo-alert.monitor")(app);
 app.listen(PORT, () => {

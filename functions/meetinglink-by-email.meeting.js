@@ -11,7 +11,7 @@ module.exports = function(app) {
       const email = (req.query.email || '').trim();
       if (!email) return res.status(400).json({});
 
-      const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+      const supabase = createClient((process.env.SUPABASE_INTERNAL_URL||process.env.SUPABASE_URL), process.env.SUPABASE_SERVICE_KEY);
       const { data: userRes, error: userErr } = await supabase.auth.getUser(token);
       if (userErr || !userRes?.user) return res.status(401).json({});
 

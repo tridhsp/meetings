@@ -6,7 +6,7 @@ module.exports = function(app) {
     const auth = req.headers.authorization || '';
     const token = auth.replace('Bearer ', '');
     if (!token) return { user: null, error: 'No token' };
-    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+    const supabase = createClient((process.env.SUPABASE_INTERNAL_URL||process.env.SUPABASE_URL), process.env.SUPABASE_ANON_KEY);
     const { data, error } = await supabase.auth.getUser(token);
     if (error || !data?.user) return { user: null, error: error?.message || 'Invalid token' };
     return { user: data.user, error: null };
@@ -16,7 +16,7 @@ module.exports = function(app) {
     try {
       const { user, error: authError } = await verifyAuth(req);
       if (authError) return res.status(401).json({ error: 'Unauthorized' });
-      const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+      const supabase = createClient((process.env.SUPABASE_INTERNAL_URL||process.env.SUPABASE_URL), process.env.SUPABASE_SERVICE_KEY);
       const transferDate = req.query.date;
       if (!transferDate) return res.status(400).json({ error: 'date is required' });
       const { data, error } = await supabase.from('student_schedule_transfers').select('*').eq('transfer_date', transferDate).order('created_at', { ascending: true });
@@ -29,7 +29,7 @@ module.exports = function(app) {
     try {
       const { user, error: authError } = await verifyAuth(req);
       if (authError) return res.status(401).json({ error: 'Unauthorized' });
-      const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+      const supabase = createClient((process.env.SUPABASE_INTERNAL_URL||process.env.SUPABASE_URL), process.env.SUPABASE_SERVICE_KEY);
       const { transfers } = req.body || {};
       if (!transfers || !transfers.length) return res.status(400).json({ error: 'transfers array is required' });
       const rows = transfers.map(t => ({
@@ -48,7 +48,7 @@ module.exports = function(app) {
     try {
       const { user, error: authError } = await verifyAuth(req);
       if (authError) return res.status(401).json({ error: 'Unauthorized' });
-      const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+      const supabase = createClient((process.env.SUPABASE_INTERNAL_URL||process.env.SUPABASE_URL), process.env.SUPABASE_SERVICE_KEY);
       const body = req.body || {};
       if (body.id) {
         const { error } = await supabase.from('student_schedule_transfers').delete().eq('id', body.id);

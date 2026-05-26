@@ -3,7 +3,7 @@ const { createClient } = require('@supabase/supabase-js');
 
 module.exports = function(app) {
   function getSupa() {
-    return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+    return createClient((process.env.SUPABASE_INTERNAL_URL||process.env.SUPABASE_URL), process.env.SUPABASE_SERVICE_KEY);
   }
   async function getUser(req) {
     const auth = req.headers.authorization || '';

@@ -6,7 +6,7 @@ module.exports = function(app) {
     const auth = req.headers.authorization || '';
     const token = auth.replace('Bearer ', '');
     if (!token) return { user: null, error: 'No token' };
-    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+    const supabase = createClient((process.env.SUPABASE_INTERNAL_URL||process.env.SUPABASE_URL), process.env.SUPABASE_ANON_KEY);
     const { data, error } = await supabase.auth.getUser(token);
     if (error || !data?.user) return { user: null, error: error?.message || 'Invalid token' };
     return { user: data.user, error: null };
@@ -17,7 +17,7 @@ module.exports = function(app) {
       const { user, error: authError } = await verifyAuth(req);
       if (authError) return res.status(401).json({ error: 'Unauthorized' });
 
-      const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+      const supabase = createClient((process.env.SUPABASE_INTERNAL_URL||process.env.SUPABASE_URL), process.env.SUPABASE_SERVICE_KEY);
       const targetDate = (req.query.date || '').trim();
       if (!targetDate) return res.status(400).json({ error: 'date is required (YYYY-MM-DD)' });
 

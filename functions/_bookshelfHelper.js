@@ -4,14 +4,14 @@
 const { createClient } = require('@supabase/supabase-js');
 
 function getSupabase() {
-  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+  return createClient((process.env.SUPABASE_INTERNAL_URL||process.env.SUPABASE_URL), process.env.SUPABASE_SERVICE_KEY);
 }
 
 async function getUser(event) {
   const auth = (event.headers && (event.headers.authorization || event.headers.Authorization)) || '';
   const token = auth.replace('Bearer ', '');
   if (!token) return null;
-  const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+  const supabase = createClient((process.env.SUPABASE_INTERNAL_URL||process.env.SUPABASE_URL), process.env.SUPABASE_ANON_KEY);
   const { data: { user }, error } = await supabase.auth.getUser(token);
   if (error || !user) return null;
   return user;

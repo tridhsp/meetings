@@ -8,7 +8,7 @@ module.exports = function(app) {
       const token = auth.replace(/^Bearer\s+/i, '');
       if (!token) return res.status(401).json({ error: 'No token' });
 
-      const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+      const supabase = createClient((process.env.SUPABASE_INTERNAL_URL||process.env.SUPABASE_URL), process.env.SUPABASE_SERVICE_KEY);
       const { data: { user }, error: authError } = await supabase.auth.getUser(token);
       if (authError || !user) return res.status(401).json({ error: 'Invalid token' });
 

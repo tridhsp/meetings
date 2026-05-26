@@ -18,7 +18,7 @@ module.exports = function(app) {
       const token = auth.split(' ')[1];
       if (!token) return res.status(401).json({ ok: false, error: 'No token' });
 
-      const supa = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY, { auth: { persistSession: false } });
+      const supa = createClient((process.env.SUPABASE_INTERNAL_URL||process.env.SUPABASE_URL), process.env.SUPABASE_SERVICE_KEY, { auth: { persistSession: false } });
       const { data: userData, error: userErr } = await supa.auth.getUser(token);
       if (userErr || !userData?.user?.email) return res.status(401).json({ ok: false, error: 'Bad token' });
       const studentEmail = userData.user.email.toLowerCase();
