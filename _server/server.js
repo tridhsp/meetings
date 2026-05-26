@@ -11,7 +11,7 @@ app.use(express.json({ limit: '5mb' }));
 app.get('/health', (req, res) => res.json({ ok: true }));
 
 // Load routes
-require("./routes/sb-url-rewrite.system")(app);
+// REMOVED Phase7: require("./routes/sb-url-rewrite.system")(app);
 require('./routes/get-student-ttkb.baihoc')(app);
 require('./routes/ttkb-zalo-cron.baihoc')(app);
 require('./routes/room-size-batch.watch')(app);
@@ -219,6 +219,8 @@ require("./routes/rec-complete-multipart.recorder")(app);
 require("./routes/rec-slot.recorder")(app);
 require("./routes/rec-slot-beacon.recorder")(app);
 require("./routes/rec-client-log.recorder")(app);
+require("./routes/rec-cleanup-orphaned.recorder")(app);
+require("./routes/rec-health-digest.recorder")(app);
 
 // (duplicate rec-client-log removed)
 
@@ -510,7 +512,9 @@ require("./routes/srch-increment-view.search")(app);
 // --- Workstimestatus App Routes (migrated from Netlify) ---
 require("./routes/wts-supabase-credentials.workstimestatus")(app);
 require("./routes/wts-get-worktime-data.workstimestatus")(app);
+require("./routes/wts-get-unscheduled-teachers.workstimestatus")(app);
 require("./routes/wts-get-slhvvagv-data.workstimestatus")(app);
+require("./routes/wts-get-dept-mismatch.workstimestatus")(app);
 // --- DanhSachHV App Routes (migrated from Netlify) ---
 require("./routes/dshv-supabase-credentials.danhsachhv")(app);
 require("./routes/dshv-caplop-options.danhsachhv")(app);
@@ -882,7 +886,7 @@ require("./routes/mon-backups.monitor")(app);
 require("./routes/mon-cache.monitor")(app);
 
 // --- Supabase Proxy ---
-require("./routes/sb-proxy.system")(app);
+// REMOVED Phase7: require("./routes/sb-proxy.system")(app);
 require("./routes/mon-latency.monitor")(app);
 require("./routes/mon-zalo-alert.monitor")(app);
 app.listen(PORT, () => {
