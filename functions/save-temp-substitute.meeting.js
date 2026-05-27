@@ -11,7 +11,7 @@ module.exports = function (app) {
   app.get('/save-temp-substitute', async (req, res) => {
     try {
       const supabase = createClient(
-        process.env.SUPABASE_URL,
+        (process.env.SUPABASE_INTERNAL_URL||process.env.SUPABASE_URL),
         process.env.SUPABASE_SERVICE_KEY,
         { auth: { persistSession: false, autoRefreshToken: false }, realtime: { transport: WebSocket } }
       );
@@ -39,7 +39,7 @@ module.exports = function (app) {
   app.post('/save-temp-substitute', async (req, res) => {
     try {
       const supabase = createClient(
-        process.env.SUPABASE_URL,
+        (process.env.SUPABASE_INTERNAL_URL||process.env.SUPABASE_URL),
         process.env.SUPABASE_SERVICE_KEY,
         { auth: { persistSession: false, autoRefreshToken: false }, realtime: { transport: WebSocket } }
       );
@@ -93,7 +93,7 @@ module.exports = function (app) {
   app.delete('/save-temp-substitute', async (req, res) => {
     try {
       const supabase = createClient(
-        process.env.SUPABASE_URL,
+        (process.env.SUPABASE_INTERNAL_URL||process.env.SUPABASE_URL),
         process.env.SUPABASE_SERVICE_KEY,
         { auth: { persistSession: false, autoRefreshToken: false }, realtime: { transport: WebSocket } }
       );

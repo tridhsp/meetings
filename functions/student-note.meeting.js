@@ -13,7 +13,7 @@ module.exports = function (app) {
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
     if (!token) { res.status(401).json({ ok: false, error: 'Missing token' }); return null; }
 
-    const SUPABASE_URL = process.env.SUPABASE_URL;
+    const SUPABASE_URL = (process.env.SUPABASE_INTERNAL_URL||process.env.SUPABASE_URL);
     const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
     if (!SUPABASE_URL || !SERVICE_KEY) { res.status(500).json({ ok: false, error: 'Missing env vars' }); return null; }
 

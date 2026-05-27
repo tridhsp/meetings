@@ -27,7 +27,7 @@ module.exports = function (app) {
       if (!token) return res.status(401).json({ error: 'No token' });
 
       const supabase = createClient(
-        process.env.SUPABASE_URL,
+        (process.env.SUPABASE_INTERNAL_URL||process.env.SUPABASE_URL),
         process.env.SUPABASE_SERVICE_KEY,
         { auth: { persistSession: false, autoRefreshToken: false }, realtime: { transport: WebSocket } }
       );

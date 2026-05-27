@@ -9,7 +9,7 @@ module.exports = function (app) {
       const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
       if (!token) return res.status(401).json({ error: 'Missing bearer token' });
 
-      const SUPABASE_URL = process.env.SUPABASE_URL;
+      const SUPABASE_URL = (process.env.SUPABASE_INTERNAL_URL||process.env.SUPABASE_URL);
       const SUPABASE_ANON = process.env.SUPABASE_ANON_KEY || process.env.ANON_PUBLIC_KEY;
       const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
       if (!SUPABASE_URL || !SUPABASE_ANON || !SERVICE_KEY) {

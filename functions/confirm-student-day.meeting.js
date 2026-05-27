@@ -6,7 +6,7 @@ const WebSocket = require('ws');
 module.exports = function (app) {
 
   async function getAuth(req, res) {
-    const SUPABASE_URL = process.env.SUPABASE_URL;
+    const SUPABASE_URL = (process.env.SUPABASE_INTERNAL_URL||process.env.SUPABASE_URL);
     const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
     if (!SUPABASE_URL || !SERVICE_KEY) { res.status(500).json({ error: 'Missing env vars' }); return null; }
 

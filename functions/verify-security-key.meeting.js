@@ -5,7 +5,7 @@ const WebSocket = require('ws');
 module.exports = function (app) {
   app.post('/verify-security-key', async (req, res) => {
     try {
-      const SUPABASE_URL = process.env.SUPABASE_URL;
+      const SUPABASE_URL = (process.env.SUPABASE_INTERNAL_URL||process.env.SUPABASE_URL);
       const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
       if (!SUPABASE_URL || !SERVICE_KEY) return res.status(500).json({ ok: false, error: 'Missing Supabase env vars' });
 
