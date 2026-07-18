@@ -261,8 +261,16 @@ function setupLoginHandler() {
     msgEl.textContent = '';
 
     if (!client) {
-      msgEl.textContent = 'Supabase đang khởi tạo, vui lòng đợi…';
-      return;
+      msgEl.textContent = 'Đang kết nối, vui lòng đợi…';
+      const _tsWaitStart = Date.now();
+      while (!client && Date.now() - _tsWaitStart < 5000) {
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      if (!client) {
+        msgEl.textContent = 'Không kết nối được máy chủ, vui lòng tải lại trang.';
+        return;
+      }
+      msgEl.textContent = '';
     }
 
     const email = document.getElementById('email').value.trim();

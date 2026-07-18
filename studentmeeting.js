@@ -252,8 +252,16 @@ function setupLoginHandler() {
         if (msgEl) { msgEl.textContent = ''; msgEl.className = ''; }
 
         if (!client) {
-            if (msgEl) msgEl.textContent = 'Supabase đang khởi tạo, vui lòng đợi…';
-            return;
+            if (msgEl) msgEl.textContent = 'Đang kết nối, vui lòng đợi…';
+            const _tsWaitStart = Date.now();
+            while (!client && Date.now() - _tsWaitStart < 5000) {
+                await new Promise((r) => setTimeout(r, 200));
+            }
+            if (!client) {
+                if (msgEl) msgEl.textContent = 'Không kết nối được máy chủ, vui lòng tải lại trang.';
+                return;
+            }
+            if (msgEl) msgEl.textContent = '';
         }
 
         const email = document.getElementById('email')?.value.trim();

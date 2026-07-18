@@ -35,11 +35,13 @@ require('./routes/status.system')(app);
 require('./routes/device-ping.baihoc')(app);
 require('./routes/lesson-ids.baihoc')(app);
 require('./routes/profile.baihoc')(app);
+require("./routes/my-announcements.baihoc")(app);
 require('./routes/gdoc-html.baihoc')(app);
 require('./routes/lesson-types.baihoc')(app);
 require('./routes/student-lookup.baihoc')(app);
 require('./routes/supabase-credentials.baihoc')(app);
 require('./routes/lessons-next.baihoc')(app);
+require('./routes/extra-next.baihoc')(app);
 require('./routes/email-suggest.baihoc')(app);
 require('./routes/lesson-submissions.baihoc')(app);
 require('./routes/device-check.baihoc')(app);
@@ -96,6 +98,7 @@ require("./routes/teachers-search.meeting")(app);
 
 // --- RealtimeReport Batch 1 ---
 require("./routes/get-user-role.realtimereport")(app);
+require("./routes/check-special-requirements.realtimereport")(app);
 require("./routes/get-user-names.realtimereport")(app);
 require("./routes/get-doc-library.realtimereport")(app);
 require("./routes/get-task-catalog.realtimereport")(app);
@@ -105,9 +108,11 @@ require("./routes/get-video-durations.realtimereport")(app);
 require("./routes/check-start-work.realtimereport")(app);
 // --- RealtimeReport Batch 2 ---
 require("./routes/check-task-limit.realtimereport")(app);
+require("./routes/check-slhv-condition.realtimereport")(app);
 require("./routes/check-task-validity.realtimereport")(app);
 require("./routes/check-ttkb-limits.realtimereport")(app);
 require("./routes/check-schedule-day.realtimereport")(app);
+require("./routes/get-makeup-days.realtimereport")(app);
 require("./routes/check-shift-permission.realtimereport")(app);
 require("./routes/check-knowledge-quiz.realtimereport")(app);
 require("./routes/check-overdue-duties.realtimereport")(app);
@@ -122,6 +127,7 @@ require("./routes/get-today-links.realtimereport")(app);
 require("./routes/get-admin-month-data.realtimereport")(app);
 require("./routes/grant-extra-session.realtimereport")(app);
 require("./routes/create-task.realtimereport")(app);
+require("./routes/get-minor-students.realtimereport")(app);
 require("./routes/create-admin-task.realtimereport")(app);
 require("./routes/create-ttkb.realtimereport")(app);
 require("./routes/save-start-work.realtimereport")(app);
@@ -162,6 +168,7 @@ require("./routes/grant-email.baihoc")(app);
 require("./routes/grant-zalo-bypass.baihoc")(app);
 require("./routes/lessons-redo-add.baihoc")(app);
 require("./routes/mark-passed.baihoc")(app);
+require('./routes/lessons-bypass.baihoc')(app);
 require("./routes/mark-viewed.baihoc")(app);
 require("./routes/note-zalo-message.baihoc")(app);
 require("./routes/reply-zalo-message.baihoc")(app);
@@ -374,6 +381,7 @@ require("./routes/wrt-send-zalo.writing")(app);
 
 // --- Watch App Routes (migrated from Netlify) ---
 require("./routes/watch-supabase-credentials.watch")(app);
+require("./routes/watch-breakout-count.watch")(app);
 require("./routes/watch-teachers-list.watch")(app);
 require("./routes/watch-meetings-list.watch")(app);
 require("./routes/watch-meetings-create.watch")(app);
@@ -402,6 +410,7 @@ require("./routes/glv-add-deduction-comment.giolamviec")(app);
 require("./routes/glv-update-granted.giolamviec")(app);
 require("./routes/glv-update-meeting-link.giolamviec")(app);
 require("./routes/glv-add-card-comment.giolamviec")(app);
+require('./routes/glv-presign-wasabi.giolamviec')(app);
 require("./routes/glv-delete-card-comment.giolamviec")(app);
 require("./routes/glv-get-card-comments.giolamviec")(app);
 require("./routes/glv-get-card-comments-batch.giolamviec")(app);
@@ -515,8 +524,11 @@ require("./routes/wts-get-worktime-data.workstimestatus")(app);
 require("./routes/wts-get-unscheduled-teachers.workstimestatus")(app);
 require("./routes/wts-get-slhvvagv-data.workstimestatus")(app);
 require("./routes/wts-get-dept-mismatch.workstimestatus")(app);
+require("./routes/wts-get-gv-warnings.workstimestatus")(app);
+require("./routes/wts-get-offday-warnings.workstimestatus")(app);
 // --- DanhSachHV App Routes (migrated from Netlify) ---
 require("./routes/dshv-supabase-credentials.danhsachhv")(app);
+require("./routes/dshv-announcements.danhsachhv")(app);
 require("./routes/dshv-caplop-options.danhsachhv")(app);
 require("./routes/dshv-danhsachhv.danhsachhv")(app);
 require("./routes/dshv-editstudent.danhsachhv")(app);
@@ -551,6 +563,25 @@ require("./routes/frm-get-templates.forms")(app);
 require("./routes/frm-get-submissions.forms")(app);
 require("./routes/frm-delete-submission.forms")(app);
 require("./routes/frm-presign-wasabi.forms")(app);
+require("./routes/frm-get-submissions-paged.forms")(app);
+require("./routes/frm-email-suggest.forms")(app);
+require("./routes/frm-check-parent-form-week.forms")(app);
+require("./routes/frm-check-student-feedback-today.forms")(app);
+require("./routes/frm-get-submission.forms")(app);
+require("./routes/frm-get-comments-batch.forms")(app);
+require("./routes/frm-add-comment.forms")(app);
+require("./routes/frm-delete-comment.forms")(app);
+require("./routes/frm-comment-send-zalo.forms")(app);
+require("./routes/frm-comment-create-duty.forms")(app);
+require("./routes/frm-view-comments.forms")(app);
+require("./routes/frm-verify-access.forms")(app);
+require("./routes/frm-restore-template.forms")(app);
+require("./routes/frm-get-trashed-templates.forms")(app);
+require("./routes/frm-set-template-lock.forms")(app);
+require("./routes/frm-restore-template-version.forms")(app);
+require("./routes/frm-get-template-versions.forms")(app);
+require("./routes/frm-check-form-done.forms")(app);
+require("./routes/frm-teacher-pick.forms")(app);
 
 // --- Assistant Routes ---
 
@@ -717,6 +748,9 @@ require("./routes/tsk-teachers.task")(app);
 require("./routes/tsk-task-delete.task")(app);
 
 require("./routes/tsk-task-update.task")(app);
+require("./routes/tsk-work-tasks-tags-update.task")(app);
+require("./routes/tsk-department-delete.task")(app);
+require("./routes/tsk-department-update.task")(app);
 
 require("./routes/tsk-update-teacher-max-sessions.task")(app);
 
@@ -888,8 +922,56 @@ require("./routes/mon-cache.monitor")(app);
 // --- Supabase Proxy ---
 // REMOVED Phase7: require("./routes/sb-proxy.system")(app);
 require("./routes/db-gate.system")(app);
+require('./routes/gb-gate.system')(app);
+require("./routes/meeting-gate.system")(app);
 require("./routes/mon-latency.monitor")(app);
 require("./routes/mon-zalo-alert.monitor")(app);
+require("./routes/rst-change-password.reset")(app);
+// --- PDF Viewer Routes ---
+require('./routes/pg-gate.pdfviewer.js')(app);
+require('./routes/pdf-supabase-credentials.pdfviewer.js')(app);
+require('./routes/pdf-presigned-url.pdfviewer.js')(app);
+require('./routes/pdf-lookup.pdfviewer.js')(app);
+require('./routes/pdf-am-i-admin.pdfviewer.js')(app);
+require('./routes/pdf-save.pdfviewer.js')(app);
+require('./routes/pdf-list.pdfviewer.js')(app);
+require('./routes/pdf-set-lock.pdfviewer.js')(app);
+require('./routes/pdf-file.pdfviewer.js')(app);
+require('./routes/pdf-download-url.pdfviewer.js')(app);
+require('./routes/pdf-media-presigned-url.pdfviewer.js')(app);
+require('./routes/pdf-media-save.pdfviewer.js')(app);
+require('./routes/pdf-media-rename.pdfviewer.js')(app);
+require('./routes/pdf-media-add-url.pdfviewer.js')(app);
+require('./routes/pdf-media-list.pdfviewer.js')(app);
+require('./routes/pdf-delete.pdfviewer.js')(app);
+require('./routes/pdf-media-delete.pdfviewer.js')(app);
+require('./routes/pdf-test-get.pdfviewer.js')(app);
+require('./routes/pdf-test-save.pdfviewer.js')(app);
+require('./routes/pdf-answer-presign.pdfviewer.js')(app);
+require('./routes/pdf-submission-save.pdfviewer.js')(app);
+require('./routes/pdf-submission-get.pdfviewer.js')(app);
+require('./routes/pdf-search-emails.pdfviewer.js')(app);
+require('./routes/pdf-grant-attempt.pdfviewer.js')(app);
+require('./routes/pdf-grant-info.pdfviewer.js')(app);
+require('./routes/pdf-answer-image.pdfviewer.js')(app);
+require('./routes/pdf-submission-delete.pdfviewer.js')(app);
+require('./routes/pdf-submission-list.pdfviewer.js')(app);
+require('./routes/pdf-am-i-staff.pdfviewer.js')(app);
+require('./routes/pdf-answer-key-list.pdfviewer.js')(app);
+require('./routes/pdf-answer-key-save.pdfviewer.js')(app);
+require('./routes/pdf-answer-key-delete.pdfviewer.js')(app);
+require('./routes/pdf-ai-mark.pdfviewer.js')(app);
+require('./routes/pdf-marking-save.pdfviewer.js')(app);
+require('./routes/pdf-self-mark.pdfviewer.js')(app);
+require('./routes/pdf-marking-get.pdfviewer.js')(app);
+require('./routes/pdf-ds-mark.pdfviewer.js')(app);
+require('./routes/pdf-answer-key-text-save.pdfviewer.js')(app);
+require('./routes/pdf-answer-key-text-get.pdfviewer.js')(app);
+// REMOVED (pdf-mark.pdfviewer.js was never created): require('./routes/pdf-mark.pdfviewer.js')(app);
+// --- Test_Prep no-score check (calendar / learntoday) ---
+require("./routes/learn-testprep-status.calendar")(app);
+require("./routes/learn-testprep-noscore.calendar")(app);
+require('./routes/cal-student-quota.calendar.js')(app);
 app.listen(PORT, () => {
   console.log('API server running on port ' + PORT);
 });
@@ -904,3 +986,18 @@ require("./routes/alert-check-ttkb.alert")(app);
 // --- TeacherCodes App Routes ---
 require("./routes/tc-get-code.teachercodes")(app);
 require("./routes/tc-upload-image.teachercodes")(app);
+
+// --- Kiosk Routes ---
+require("./routes/ksk-whitelist.kiosk")(app);
+require("./routes/msg-credentials.message")(app);
+require("./routes/reg-change-password.register")(app);
+
+// --- Score (score.tansinh.info) routes ---
+require("./routes/score-supabase-credentials.score")(app);
+require("./routes/score-get-role.score")(app);
+require("./routes/score-list-skills.score")(app);
+require("./routes/score-save-skills.score")(app);
+require("./routes/score-save-results.score")(app);
+require("./routes/score-list-results.score")(app);
+require("./routes/score-suggest-learners.score")(app);
+require("./routes/score-presign-r2.score")(app);
