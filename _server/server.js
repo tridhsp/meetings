@@ -21,6 +21,7 @@ require('./routes/learn-today-data.notice')(app);
 require('./routes/learn-joins-today.notice')(app);
 require('./routes/learn-notes-today.notice')(app);
 require('./routes/learn-today-boot.notice')(app);
+require('./routes/learn-req-chain.notice')(app);
 require('./routes/check-exceeded-students.notice')(app);
 require('./routes/check-unjoined-students.notice')(app);
 require('./routes/remind-unnoted-cron.message')(app);
@@ -57,6 +58,11 @@ require('./routes/save-submission.baihoc')(app);
 require('./routes/approve-submission.baihoc')(app);
 require('./routes/approved-lessons.baihoc')(app);
 require('./routes/uu-tien-settings.baihoc')(app);
+require('./routes/speaking-days.baihoc')(app);
+require('./routes/testing-settings.baihoc')(app);
+require('./routes/testing-today.baihoc')(app);
+require('./routes/speaking-today.baihoc')(app);
+require('./routes/speaking-bypass.baihoc')(app);
 require('./routes/meetingsfrommeetingcontent.meeting')(app);
 require('./routes/offdays-range.meeting')(app);
 require('./routes/student-note.meeting')(app);
@@ -147,7 +153,10 @@ require("./routes/rtr-presign-wasabi.realtimereport")(app);
 // --- Bookshelf Routes ---
 require("./routes/books-api.bookshelf")(app);
 require("./routes/chapters-api.bookshelf")(app);
+require("./routes/versions-api.bookshelf")(app);  // BOOKVER-20260910 version history for books and lessons
+require("./routes/section-presets-api.bookshelf")(app);  // TSPATCH-SECPRESETS-20260831
 require("./routes/categories-api.bookshelf")(app);
+require("./routes/quiz-tags-api.bookshelf")(app);
 require("./routes/levels-api.bookshelf")(app);
 require("./routes/wordwise-api.bookshelf")(app);
 require("./routes/wordwise-generate-background.bookshelf")(app);
@@ -155,6 +164,7 @@ require("./routes/word-lookup.bookshelf")(app);
 require("./routes/mw-audio-api.bookshelf")(app);
 require("./routes/presign-wasabi-bookshelf.bookshelf")(app);
 require("./routes/supabase-credentials-bookshelf.bookshelf")(app);
+require("./routes/proofs-api.bookshelf")(app);
 
 // --- Baihoc Remaining Functions (migrated from Netlify) ---
 require("./routes/device-approval-api.baihoc")(app);
@@ -343,6 +353,7 @@ require("./routes/gb-supabase-credentials.giaobai")(app);
 require("./routes/gb-universallevels-sync.giaobai")(app);
 require("./routes/gb-unpause-book.giaobai")(app);
 require("./routes/gb-update-assigned-type.giaobai")(app);
+require("./routes/gb-unassign-book.giaobai")(app);
 require("./routes/gb-update-book.giaobai")(app);
 require("./routes/gb-update-lesson.giaobai")(app);
 
@@ -417,6 +428,7 @@ require("./routes/glv-get-card-comments-batch.giolamviec")(app);
 require("./routes/glv-get-calculated-time.giolamviec")(app);
 require("./routes/glv-get-calculated-time-batch.giolamviec")(app);
 require("./routes/glv-search-students.giolamviec")(app);
+require("./routes/glv-push.giolamviec")(app);
 
 // --- Calling App Routes (migrated from Netlify) ---
 require("./routes/calling-supabase-credentials.calling")(app);
@@ -638,10 +650,17 @@ require("./routes/tck-update-test-time.timedcheck")(app);
 
 // --- Homepage Routes ---
 require("./routes/hp-supabase-credentials.homepage")(app);
+require("./routes/scr-supabase-credentials.screenrec")(app);
+require("./routes/scr-upload-ticket.screenrec")(app);
+// --- cổng ghi hình cho realtimereport (xem 2.13-RECGATE) ---
+require("./routes/scr-work-session.screenrec")(app);
+require("./routes/rtr-recording-status.realtimereport")(app);
 
 // --- Speaking Routes ---
 
 require("./routes/spk-supabase-credentials.speaking")(app);
+
+require("./routes/spk-level-topic-counts.speaking")(app);
 
 require("./routes/spk-get-speaking.speaking")(app);
 
@@ -702,6 +721,7 @@ require("./routes/spk-save-complaint.speaking")(app);
 require("./routes/spk-save-homework-content.speaking")(app);
 require("./routes/spk-update-homework-status.speaking")(app);
 require("./routes/spk-send-zalo.speaking")(app);
+require("./routes/spk-auto-grade-cron.speaking")(app);
 
 // --- Speech Routes ---
 
@@ -734,6 +754,7 @@ require("./routes/rt-recent-tts-list.readtext")(app);
 require("./routes/rt-speak.readtext")(app);
 
 require("./routes/rt-speak-background.readtext")(app);
+require("./routes/rt-conversation-background.readtext")(app);
 
 require("./routes/rt-voices.readtext")(app);
 
@@ -765,6 +786,7 @@ require("./routes/tsk-work-tasks-tags-delete.task")(app);
 require("./routes/tsk-work-tasks-tags-list.task")(app);
 
 require("./routes/tsk-work-tasks-teacher-assignments.task")(app);
+require("./routes/tsk-quicknotes.task")(app);
 
 // --- StudentVideo Routes ---
 
@@ -967,11 +989,52 @@ require('./routes/pdf-marking-get.pdfviewer.js')(app);
 require('./routes/pdf-ds-mark.pdfviewer.js')(app);
 require('./routes/pdf-answer-key-text-save.pdfviewer.js')(app);
 require('./routes/pdf-answer-key-text-get.pdfviewer.js')(app);
+require('./routes/pdf-restore.pdfviewer.js')(app);
 // REMOVED (pdf-mark.pdfviewer.js was never created): require('./routes/pdf-mark.pdfviewer.js')(app);
 // --- Test_Prep no-score check (calendar / learntoday) ---
 require("./routes/learn-testprep-status.calendar")(app);
 require("./routes/learn-testprep-noscore.calendar")(app);
 require('./routes/cal-student-quota.calendar.js')(app);
+// device.tansinh.info — server inventory, Super Admin only
+require('./routes/dev-api.device.js')(app);
+
+
+/* ---- Test app (test.tansinh.info) ---- */
+require('./routes/tst-credentials.test.js')(app);
+require('./routes/tst-tests.test.js')(app);
+require('./routes/tst-skills.test.js')(app);
+require('./routes/tst-submissions.test.js')(app);
+require('./routes/tst-marking.test.js')(app);
+require('./routes/tst-presign-wasabi.test.js')(app);
+require('./routes/tst-send-zalo.test.js')(app);
+// RETIRED 2026-08-03 (replaced by testing-today.baihoc): require('./routes/test-mode.baihoc.js')(app);
+/* ---- end Test app ---- */
+require("./routes/wsp-api.whisper")(app);
+require("./routes/ring-api.ring")(app);
+require("./routes/ring-phone.ring")(app);
+require("./routes/ring-rec.ring")(app);   // recordings rail, 9 Sep 2026
+require("./routes/aic-api.whisper")(app);
+require("./routes/wsp-batch.whisper")(app);
+require("./routes/wsp-assess.whisper")(app);
+require("./routes/rd-api.rustdesk")(app);
+require("./routes/dl-api.download")(app);
+require("./routes/wsp-assessbatch.whisper")(app);
+require("./routes/wsp-meetscan.whisper")(app);
+require("./routes/wsp-meetassess.whisper")(app);
+require("./routes/wsp-proofscan.whisper")(app);  // TSPATCH-PROOFSCAN-20260829
+require("./routes/wsp-proofassess.whisper")(app);  // TSPATCH-PROOFASSESS-20260829
+require('./routes/lv-api.lessonvideo.js')(app);
+require('./routes/scr-settings.screenrec')(app);
+require('./routes/bk-api.backup.js')(app);
+require('./routes/nc-auth.nextcloud.js')(app);
+require('./routes/nc-roles.nextcloud.js')(app);
+require('./routes/wop-api.doc.js')(app); // doc.tansinh.info WOPI host
+require('./routes/doc-api.vanban.js')(app);
+/* TSPATCH-SUBMOUNT-20260827 -- submit.tansinh.info */
+require('./routes/sub-api.submit.js')(app);
+
+require('./routes/mtx-api.messages.js')(app);
+require("./routes/rts-api.ringts")(app);
 app.listen(PORT, () => {
   console.log('API server running on port ' + PORT);
 });
@@ -1001,3 +1064,5 @@ require("./routes/score-save-results.score")(app);
 require("./routes/score-list-results.score")(app);
 require("./routes/score-suggest-learners.score")(app);
 require("./routes/score-presign-r2.score")(app);
+require("./routes/glv-grant-day-context.giolamviec")(app);
+require("./routes/glv-month-confirm.giolamviec")(app);
