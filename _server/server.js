@@ -61,6 +61,7 @@ require('./routes/uu-tien-settings.baihoc')(app);
 require('./routes/speaking-days.baihoc')(app);
 require('./routes/testing-settings.baihoc')(app);
 require('./routes/testing-today.baihoc')(app);
+require('./routes/test-session.baihoc')(app);   /* P5-20261002 */
 require('./routes/speaking-today.baihoc')(app);
 require('./routes/speaking-bypass.baihoc')(app);
 require('./routes/meetingsfrommeetingcontent.meeting')(app);
@@ -165,6 +166,9 @@ require("./routes/mw-audio-api.bookshelf")(app);
 require("./routes/presign-wasabi-bookshelf.bookshelf")(app);
 require("./routes/supabase-credentials-bookshelf.bookshelf")(app);
 require("./routes/proofs-api.bookshelf")(app);
+require("./routes/bs-sources.bookshelf")(app);  // BOOKSRC-20260915 books <-> search.tansinh.info articles
+require("./routes/writing-api.bookshelf")(app);   // ANSBOX-20260922
+require("./routes/speaking-api.bookshelf")(app);   // SPEAKX-20260925a the Speaking task route
 
 // --- Baihoc Remaining Functions (migrated from Netlify) ---
 require("./routes/device-approval-api.baihoc")(app);
@@ -199,8 +203,10 @@ require("./routes/quiz-search-students.quiz")(app);
 require("./routes/quiz-submissions-list.quiz")(app);
 require("./routes/quiz-grant-extra-attempt.quiz")(app);
 require("./routes/quiz-submission-get.quiz")(app);
+require("./routes/quiz-mark-adjust.quiz")(app); // quiz-marks 18 Sep 2026
 require("./routes/quiz-presign-wasabi.quiz")(app);
 require("./routes/quiz-emergency-submit.quiz")(app);
+require("./routes/quiz-av-convert.quiz")(app); // quiz-av 7 Oct 2026: probe + convert media so Safari can play it
 
 // --- Penalty Routes ---
 require("./routes/pen-credentials.penalty")(app);
@@ -327,6 +333,7 @@ require("./routes/user-role-suggest.calendar")(app);
 // --- Giao Bai App Routes (migrated from Netlify) ---
 require("./routes/gb-add-book-exclusion.giaobai")(app);
 require("./routes/gb-add-lesson-exclusion.giaobai")(app);
+require("./routes/gb-remove-lesson-exclusion.giaobai")(app);   // GBLEX-20261001
 require("./routes/gb-all-students-books.giaobai")(app);
 require("./routes/gb-assign-book.giaobai")(app);
 require("./routes/gb-books-list.giaobai")(app);
@@ -341,12 +348,14 @@ require("./routes/gb-lesson-today-save.giaobai")(app);
 require("./routes/gb-lessons-by-book.giaobai")(app);
 require("./routes/gb-list-student-books.giaobai")(app);
 require("./routes/gb-pause-book.giaobai")(app);
+require("./routes/gb-book-status.giaobai")(app);   // tansinh gbstatus
 require("./routes/gb-prioritize-list.giaobai")(app);
 require("./routes/gb-prioritize-save.giaobai")(app);
 require("./routes/gb-remove-book-exclusion.giaobai")(app);
 require("./routes/gb-search-emails.giaobai")(app);
 require("./routes/gb-set-book-delay.giaobai")(app);
 require("./routes/gb-set-book-priority.giaobai")(app);
+require("./routes/gb-sync.giaobai")(app); // GBSYNC-20261001
 require("./routes/gb-students-by-book.giaobai")(app);
 require("./routes/gb-suggest-books.giaobai")(app);
 require("./routes/gb-supabase-credentials.giaobai")(app);
@@ -914,6 +923,8 @@ require("./routes/zt-zaloids.zalotracker")(app);
 // --- UserRole Routes ---
 require("./routes/ur-verify-security-key.userrole")(app);
 require("./routes/ur-delete-user.userrole")(app);
+// === tansinh archive-routes (21 Sep 2026) ===
+require("./routes/ur-archive.userrole")(app);
 require("./routes/ur-update-name.userrole")(app);
 require("./routes/ur-update-role.userrole")(app);
 
@@ -1011,7 +1022,10 @@ require('./routes/tst-send-zalo.test.js')(app);
 /* ---- end Test app ---- */
 require("./routes/wsp-api.whisper")(app);
 require("./routes/ring-api.ring")(app);
+require("./routes/ring-contacts.ring")(app);   // tansinh danhba (13 Sep 2026)
+require("./routes/ring-key.ring")(app);   // tansinh keys (13 Sep 2026)
 require("./routes/ring-phone.ring")(app);
+require("./routes/tm-coverage.teachers")(app);   // TM-COVERAGE-20261005
 require("./routes/ring-rec.ring")(app);   // recordings rail, 9 Sep 2026
 require("./routes/aic-api.whisper")(app);
 require("./routes/wsp-batch.whisper")(app);
@@ -1035,6 +1049,11 @@ require('./routes/sub-api.submit.js')(app);
 
 require('./routes/mtx-api.messages.js')(app);
 require("./routes/rts-api.ringts")(app);
+require("./routes/exp-api.explain")(app);
+require("./routes/decuong-list.baihoc")(app);   // TSPATCH-DECUONG-20260930 the De cuong list route
+require("./routes/cal-contracts.calendar")(app);  // === tc contract BEGIN (7 Oct 2026) === END ===
+require("./routes/cal-fixedhours.calendar")(app);   // tansinh fixed-blocks (8 Oct 2026)
+require("./routes/cal-offhistory.calendar")(app);   // tansinh off-history (8 Oct 2026)
 app.listen(PORT, () => {
   console.log('API server running on port ' + PORT);
 });

@@ -112,9 +112,10 @@ function bookSource(b) {
 //  Fetch exclusions + delays
 // ────────────────────────────────────────────────
 async function fetchFilters(sb, email) {
-  const [exclRes, delayRes] = await Promise.all([
+  const [exclRes, delayRes, gbStRes] = await Promise.all([
     sb.from('lessons_exclusions_used_for_books').select('book_code').eq('student_email', email),
-    sb.from('lessons_book_delays').select('book_code, delay_until').eq('student_email', email)
+    sb.from('lessons_book_delays').select('book_code, delay_until').eq('student_email', email),
+    /* === tansinh gbstatus BEGIN (rr-fetch) === */ sb.from('gb_book_status').select('book_code, scope').in('status', ['paused', 'removed']) /* === tansinh gbstatus END (rr-fetch) === */
   ]);
 
   const excludedBookCodes = new Set(((exclRes.data) || []).map(r => r.book_code));
@@ -128,14 +129,32 @@ async function fetchFilters(sb, email) {
   if (exclRes.error) console.error('[RR] exclusions fetch error:', exclRes.error.message);
   if (delayRes.error) console.error('[RR] delays fetch error:', delayRes.error.message);
 
-  return { excludedBookCodes, delayedBookCodes };
+  /* === tansinh gbstatus BEGIN (rr-sets) === */
+  /* GBSTATUS-20261003. A book paused or removed on the Giao bài page (table gb_book_status).
+     scope 'all' -> never in the rotation; scope 'level' -> not in the rotation unless the learner
+     has it assigned by hand. A missing table leaves gbStRes.data null: nothing changes. */
+  const gbStatusAll = new Set(), gbStatusLevel = new Set();
+  for (const _s of ((gbStRes && gbStRes.data) || [])) {
+    if (!_s || !_s.book_code) continue;
+    (String(_s.scope || 'level') === 'all' ? gbStatusAll : gbStatusLevel).add(String(_s.book_code).trim());
+  }
+  /* === tansinh gbstatus END (rr-sets) === */
+  return { excludedBookCodes, delayedBookCodes, gbStatusAll, gbStatusLevel };
 }
 
 // ────────────────────────────────────────────────
 //  Check if a book can participate in round-robin
 // ────────────────────────────────────────────────
-function isParticipatable(b, excludedBookCodes, delayedBookCodes) {
+function isParticipatable(b, excludedBookCodes, delayedBookCodes, gbSt) {
   const src = bookSource(b);
+  /* === tansinh gbstatus BEGIN (rr-rule) === */
+  if (gbSt) {
+    const _c = String((b && b.book_code) || '').trim();
+    if (gbSt.all && gbSt.all.has(_c)) return false;
+    const _mine = (b && b.is_assigned === true) || (b && typeof b.assigned_as === 'string' && b.assigned_as.trim() !== '');
+    if (gbSt.level && gbSt.level.has(_c) && !_mine) return false;
+  }
+  /* === tansinh gbstatus END (rr-rule) === */
 
   // Special books are standalone catalog items: a student only "has" a special
   // book if it was explicitly assigned (lessons_assigned). Special books that are
@@ -188,10 +207,10 @@ async function fetchBookSkills(sb, bookCodes) {
 async function getStageGatedPool(email) {
   const sb = getSB();
   const { lessons: allBooks } = await fetchStudentBooks(email);
-  const { excludedBookCodes, delayedBookCodes } = await fetchFilters(sb, email);
+  const { excludedBookCodes, delayedBookCodes, gbStatusAll, gbStatusLevel } = await fetchFilters(sb, email);
 
   // Books that CAN participate in round-robin (valid type, not paused/excluded/delayed)
-  const participatable = allBooks.filter(b => isParticipatable(b, excludedBookCodes, delayedBookCodes));
+  const participatable = allBooks.filter(b => isParticipatable(b, excludedBookCodes, delayedBookCodes, /* === tansinh gbstatus BEGIN (rr-pool) === */ { all: gbStatusAll, level: gbStatusLevel } /* === tansinh gbstatus END (rr-pool) === */));
 
   // Stage 0 = always independent, never gated
   const stage0 = participatable.filter(b => (parseFloat(b.stage) || 0) === 0);

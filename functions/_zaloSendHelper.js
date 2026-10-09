@@ -121,16 +121,17 @@ async function sendToOne(opts) {
   const id = String(zaloId || '').trim();
   const name = String(opts.name || '').trim() || id;
   const imageUrls = opts.imageUrls || [];
+  const dedupeKey = imageUrls.length ? text + '\n' + imageUrls.join('\n') : text;   // TANSINH IMG-ZALO-V2: a photo is its own message, whatever its caption
   const none = (status, detail, total) => ({ status, detail, sent: 0, failed: status === 'failed' ? (total || 0) : 0, total: total || 0 });
   try {
     if (!id) return none('skipped', 'chưa có Zalo ID');
     if (!windowOpen()) return none('skipped', 'ngoài giờ gửi Zalo (06:00–21:45)');
     // sentRecently keys on the display name, which is what the sent log stores
-    if (await sentRecently(sb, { ten_hv: name }, text)) return none('skipped', 'trùng tin vừa gửi (10 phút)', 1);
+    if (await sentRecently(sb, { ten_hv: name }, dedupeKey)) return none('skipped', 'trùng tin vừa gửi (10 phút)', 1);   /* TANSINH IMG-ZALO-V2 */
     const token = await latestToken(sb);
     if (!token) return none('failed', 'không có access_token Zalo', 1);
 
-    const finalText = text + '\n\n' + FOOTER(staffName || 'TANSINH');
+    const finalText = (text ? text + '\n\n' : '') + FOOTER(staffName || 'TANSINH');   /* TANSINH IMG-ZALO-V2: no blank lines above the footer on a photo */
     const bangkokIso = new Date(Date.now() + 7 * 3600 * 1000).toISOString();
     const r = await sendOne(token, id, finalText, imageUrls);
 
@@ -142,7 +143,7 @@ async function sendToOne(opts) {
 
     const { error: logErr } = await sb.from('zalo_sent_messages').insert({
       sender_name: staffName || 'Staff', account_id: accountId || null,
-      student_name: name, receiver_id: id, content: text, image_urls: imageUrls
+      student_name: name, receiver_id: id, content: dedupeKey, image_urls: imageUrls   /* TANSINH IMG-ZALO-V2 */
     });
     if (logErr) console.log('[zalo] zalo_sent_messages insert failed:', logErr.message);
 
@@ -157,18 +158,19 @@ async function sendToOne(opts) {
 async function sendToFamily(opts) {
   const { sb, linkedEmail, text, staffName, accountId, oaId } = opts;
   const imageUrls = opts.imageUrls || [];
+  const dedupeKey = imageUrls.length ? text + '\n' + imageUrls.join('\n') : text;   // TANSINH IMG-ZALO-V2: a photo is its own message, whatever its caption
   const none = (status, detail, total) => ({ status, detail, sent: 0, failed: status === 'failed' ? (total || 0) : 0, total: total || 0 });
   try {
     if (!windowOpen()) return none('skipped', 'ngoài giờ gửi Zalo (06:00–21:45)');
     const fam = await resolveFamily(sb, linkedEmail);
     if (!fam.found) return none('skipped', fam.reason === 'no_email' ? 'chưa liên kết email' : 'không có trong danh bạ Zalo');
     if (!fam.targets.length) return none('skipped', 'chưa có Zalo ID');
-    if (await sentRecently(sb, fam, text)) return none('skipped', 'trùng tin vừa gửi (10 phút)', fam.targets.length);
+    if (await sentRecently(sb, fam, dedupeKey)) return none('skipped', 'trùng tin vừa gửi (10 phút)', fam.targets.length);   /* TANSINH IMG-ZALO-V2 */
 
     const token = await latestToken(sb);
     if (!token) return none('failed', 'không có access_token Zalo', fam.targets.length);
 
-    const finalText = text + '\n\n' + FOOTER(staffName || 'TANSINH');
+    const finalText = (text ? text + '\n\n' : '') + FOOTER(staffName || 'TANSINH');   /* TANSINH IMG-ZALO-V2: no blank lines above the footer on a photo */
     const bangkokIso = new Date(Date.now() + 7 * 3600 * 1000).toISOString();
     let sent = 0; const expired = [];
     for (const t of fam.targets) {
@@ -186,7 +188,7 @@ async function sendToFamily(opts) {
     // the old app's sent log — one row per student, same shape as bulk-send-zalo
     const { error: logErr } = await sb.from('zalo_sent_messages').insert({
       sender_name: staffName || 'Staff', account_id: accountId || null,
-      student_name: fam.ten_hv, receiver_id: fam.zalo_key, content: text, image_urls: imageUrls
+      student_name: fam.ten_hv, receiver_id: fam.zalo_key, content: dedupeKey, image_urls: imageUrls   /* TANSINH IMG-ZALO-V2 */
     });
     if (logErr) console.log('[zalo] zalo_sent_messages insert failed:', logErr.message);
 
