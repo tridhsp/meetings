@@ -81,17 +81,17 @@ async function showApp() {
   // Wire up sidebar
   setupConfirmationSidebar();
 
-  // Load calendar data
+  // tansinh conf-board v1: draw the board first ("Đang kiểm tra…"), then load.
+  // The calendar fixes the week; the other three loads run side by side.
+  renderConfirmUI();
+  setupRailClicks();
   await loadCalendarData();
-  await loadStudentNotes();
-  await loadMyStudents();
-  await loadFreeHours();
-  await loadAllConfirmations();
-  setupStepperClicks();
-
-  // Show stepper
-  const stepper = document.getElementById('confStepper');
-  if (stepper) stepper.classList.add('visible');
+  await Promise.all([
+    (async () => { await loadStudentNotes(); await loadMyStudents(); })(),
+    loadFreeHours(),
+    loadAllConfirmations()
+  ]);
+  renderConfirmUI();
 }
 
 function setupPasswordToggle() {
@@ -721,6 +721,9 @@ function msInitials(nameOrEmail) {
 }
 
 async function loadMyStudents() {
+  // tansinh conf-board v1: this used to own its own "Xác nhận danh sách HV"
+  // button and its own GET of confirm-student-day. Both are gone; the section
+  // header is rendered by renderSectionAction() from the one shared state.
   const content = document.getElementById('myStudentsContent');
   if (!content) return;
 
@@ -742,7 +745,7 @@ async function loadMyStudents() {
     const data = out.data || {};
     const dayLabelsLong = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
 
-    // Get this week's dates
+    // This week's dates
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayDow = today.getDay();
@@ -758,20 +761,6 @@ async function loadMyStudents() {
 
     const mondayYMD = formatYMD(monday);
 
-    // Check if student list is already confirmed this week
-    let studentConfirmed = false;
-    try {
-      const confRes = await fetch(`${_DO}/confirm-student-day?weekStartDate=${mondayYMD}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const confOut = await confRes.json();
-      if (confOut.ok) studentConfirmed = !!confOut.confirmed;
-    } catch (e) {
-      console.warn('Could not check student confirmation:', e);
-    }
-
-    
-
     // Order: Mon → Sun
     const dowOrder = [1, 2, 3, 4, 5, 6, 0];
 
@@ -783,141 +772,75 @@ async function loadMyStudents() {
       }
     }
 
-    // Confirm button (defined here so it's available for both cases)
-    const confirmBtnHtml = studentConfirmed
-      ? `<div class="ms-confirm-row">
-           <button class="ms-confirm-btn confirmed" disabled>
-             <i class="fa-solid fa-circle-check"></i> Đã xác nhận danh sách HV ✓
-           </button>
-         </div>`
-      : `<div class="ms-confirm-row">
-           <button class="ms-confirm-btn" id="msConfirmBtn" data-week="${mondayYMD}">
-             <i class="fa-solid fa-check-circle"></i> Xác nhận danh sách HV tuần này
-           </button>
-         </div>`;
-
-    let bodyHtml = '';
+    cfCounts.students = `${allStudents.size} HV`;
+    const metaEl = document.getElementById('cfStudentsMeta');
+    if (metaEl) metaEl.textContent = cfCounts.students;
 
     if (allStudents.size === 0) {
-      bodyHtml = `<div class="ms-section-body ms-empty">
+      content.innerHTML = `<div class="cf-empty">
         <i class="fa-solid fa-info-circle" style="font-size:2rem;color:#3b82f6;display:block;margin-bottom:8px"></i>
         Bạn chưa được phân công HV nào
       </div>`;
-    } else {
-      let daysHtml = '';
+      return;
+    }
 
-      for (const dow of dowOrder) {
-        const students = data[dow];
-        if (!students || !students.length) continue;
+    let daysHtml = '';
 
-        const dayOffset = dow === 0 ? 6 : dow - 1;
-        const dayDate = addDays(monday, dayOffset);
-        const dd = String(dayDate.getDate()).padStart(2, '0');
-        const mm = String(dayDate.getMonth() + 1).padStart(2, '0');
+    for (const dow of dowOrder) {
+      const students = data[dow];
+      if (!students || !students.length) continue;
 
-        const studentItems = students.map(s => {
-          const ini = msInitials(s.student_name);
-          const timeStr = (s.time_local || '').slice(0, 5);
-          const roleClass = s.role === 'Breakout' ? 'ms-role-breakout' : 'ms-role-ttkb';
-          const existingNotes = getStudentNotes(s.student_email, dow);
-          const hasNote = existingNotes.length > 0;
-          const noteClass = hasNote ? ' ms-student-has-note' : '';
-          const latestNote = hasNote ? existingNotes[0] : null;
-          const notePreview = latestNote
-            ? `<div class="ms-student-note-preview"><i class="fa-solid fa-flag"></i> "${msEsc(latestNote.note.slice(0, 60))}${latestNote.note.length > 60 ? '...' : ''}"</div>`
-            : '';
-          const clickData = JSON.stringify({
-            studentEmail: s.student_email,
-            studentName: s.student_name,
-            dayOfWeek: dow,
-            timeLocal: timeStr,
-            role: s.role || 'TTKB',
-            dayLabel: dayLabelsLong[dow] + ' ' + dd + '/' + mm,
-            weekStartDate: mondayYMD
-          }).replace(/'/g, '\\u0027');
-          return `
-            <div class="ms-student${noteClass}" style="cursor:pointer;" onclick='openStudentNoteModal(${clickData})'>
-              <div class="ms-student-avatar">${msEsc(ini)}</div>
-              <div class="ms-student-info">
-                <span class="ms-student-name">${msEsc(s.student_name)} <i class="fa-solid fa-flag ms-student-note-icon" title="Ghi chú về HV này"></i></span>
-                <span class="ms-student-role ${roleClass}">${msEsc(s.role || 'TTKB')}</span>
-                ${notePreview}
-              </div>
-              <span class="ms-student-time">${msEsc(timeStr)}</span>
-            </div>`;
-        }).join('');
+      const dayOffset = dow === 0 ? 6 : dow - 1;
+      const dayDate = addDays(monday, dayOffset);
+      const dd = String(dayDate.getDate()).padStart(2, '0');
+      const mm = String(dayDate.getMonth() + 1).padStart(2, '0');
 
-        daysHtml += `
-          <div class="ms-day">
-            <div class="ms-day-head">
-              <span class="ms-day-dow">${dayLabelsLong[dow]}</span>
-              <span class="ms-day-date">${dd}/${mm}</span>
-              <span class="ms-day-count">${students.length} HV</span>
+      const studentItems = students.map(s => {
+        const ini = msInitials(s.student_name);
+        const timeStr = (s.time_local || '').slice(0, 5);
+        const roleClass = s.role === 'Breakout' ? 'ms-role-breakout' : 'ms-role-ttkb';
+        const existingNotes = getStudentNotes(s.student_email, dow);
+        const hasNote = existingNotes.length > 0;
+        const noteClass = hasNote ? ' ms-student-has-note' : '';
+        const latestNote = hasNote ? existingNotes[0] : null;
+        const notePreview = latestNote
+          ? `<div class="ms-student-note-preview"><i class="fa-solid fa-flag"></i> "${msEsc(latestNote.note.slice(0, 60))}${latestNote.note.length > 60 ? '...' : ''}"</div>`
+          : '';
+        const clickData = JSON.stringify({
+          studentEmail: s.student_email,
+          studentName: s.student_name,
+          dayOfWeek: dow,
+          timeLocal: timeStr,
+          role: s.role || 'TTKB',
+          dayLabel: dayLabelsLong[dow] + ' ' + dd + '/' + mm,
+          weekStartDate: mondayYMD
+        }).replace(/'/g, '\\u0027');
+        return `
+          <div class="ms-student${noteClass}" style="cursor:pointer;" onclick='openStudentNoteModal(${clickData})'>
+            <div class="ms-student-avatar">${msEsc(ini)}</div>
+            <div class="ms-student-info">
+              <span class="ms-student-name">${msEsc(s.student_name)} <i class="fa-solid fa-flag ms-student-note-icon" title="Ghi chú về HV này"></i></span>
+              <span class="ms-student-role ${roleClass}">${msEsc(s.role || 'TTKB')}</span>
+              ${notePreview}
             </div>
-            ${studentItems}
+            <span class="ms-student-time">${msEsc(timeStr)}</span>
           </div>`;
-      }
+      }).join('');
 
-      
-
-      bodyHtml = `<div class="ms-section-body">${daysHtml}</div>`;
+      daysHtml += `
+        <div class="ms-day">
+          <div class="ms-day-head">
+            <span class="ms-day-dow">${dayLabelsLong[dow]}</span>
+            <span class="ms-day-date">${dd}/${mm}</span>
+            <span class="ms-day-count">${students.length} HV</span>
+          </div>
+          ${studentItems}
+        </div>`;
     }
 
     content.innerHTML = `
-      <section class="ms-section">
-        <div class="ms-section-head">
-          <h2><i class="fa-solid fa-user-graduate"></i> HV bạn phụ trách</h2>
-          <span class="ms-section-badge">${allStudents.size} HV</span>
-          <i class="fa-solid fa-chevron-down ms-section-chevron"></i>
-        </div>
-        <div class="ms-description">
-          <i class="fa-solid fa-circle-info"></i>
-          Hãy đảm bảo HV thuộc nhóm bạn phụ trách và hãy đảm bảo giờ bạn tiếp HV đúng với lịch liệt kê.
-          Nếu có sai lệch, vui lòng báo lại quản lý.
-        </div>
-        ${confirmBtnHtml}
-        ${bodyHtml}
-      </section>`;
-
-    // Wire up collapse toggle
-    content.querySelector('.ms-section-head')?.addEventListener('click', () => {
-      content.querySelector('.ms-section')?.classList.toggle('collapsed');
-    });
-
-    // Wire up confirm button
-    const confirmBtn = document.getElementById('msConfirmBtn');
-    if (confirmBtn) {
-      confirmBtn.addEventListener('click', async () => {
-        const week = confirmBtn.dataset.week;
-
-        confirmBtn.disabled = true;
-        confirmBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xác nhận...';
-
-        try {
-          const confRes = await fetch(_DO + '/confirm-student-day', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ weekStartDate: week })
-          });
-          const confOut = await confRes.json();
-          if (!confRes.ok || !confOut.ok) throw new Error(confOut.error || 'Lỗi');
-
-          confirmBtn.className = 'ms-confirm-btn confirmed';
-          confirmBtn.innerHTML = '<i class="fa-solid fa-circle-check"></i> Đã xác nhận danh sách HV ✓';
-
-          if (typeof showSuccessToast === 'function') {
-            showSuccessToast('Đã xác nhận danh sách HV tuần này!');
-          }
-        } catch (e) {
-          confirmBtn.disabled = false;
-          confirmBtn.innerHTML = '<i class="fa-solid fa-check-circle"></i> Xác nhận danh sách HV tuần này';
-          alert('Lỗi: ' + e.message);
-        }
-      });
-    }
+      <p class="cf-hint"><i class="fa-solid fa-circle-info"></i>Hãy đảm bảo HV thuộc nhóm bạn phụ trách và giờ tiếp HV đúng với lịch. Nếu có sai lệch, bấm vào HV đó để ghi chú cho quản lý trước khi xác nhận.</p>
+      <div class="ms-days">${daysHtml}</div>`;
 
   } catch (e) {
     content.innerHTML = `<div class="calendar-loading"><span>Lỗi: ${msEsc(e.message)}</span></div>`;
@@ -1215,179 +1138,288 @@ function renderFreeHours(ranges) {
   grid.innerHTML = html;
 }
 
-// ========== UNIFIED CONFIRMATION STEPPER ==========
+// ========== CONFIRMATION BOARD v1 (09 Oct 2026) ==========
+// Replaces the bottom stepper and the shared pop-up.
+// ONE state drives everything: confState[key] (true/false) and cfAt[key] (when).
+// Every change calls renderConfirmUI(), which rebuilds the left panel and all
+// three section headers from that state. Nothing is cloned, so a button can
+// never carry a stale "disabled" over to the next step. That is the fix for
+// "I have to refresh to confirm the next one".
+
+const CF_STEPS = ['freehours', 'schedule', 'students'];
+const cfInfo = {
+  freehours: { url: _DO + '/confirm-free-hours',  label: 'Giờ rảnh',      secId: 'secFreehours' },
+  schedule:  { url: _DO + '/confirm-week',        label: 'Lịch tuần này', secId: 'secSchedule'  },
+  students:  { url: _DO + '/confirm-student-day', label: 'Danh sách HV',  secId: 'secStudents'  }
+};
+const cfAt = { freehours: null, schedule: null, students: null };
+const cfCounts = { students: '' };
+let cfLoaded = false;   // the three GETs have answered
+let cfArmed = null;     // which step shows "Chắc chắn?"
+let cfBusy = null;      // which step is being posted
+let cfArmTimer = null;
+
+// Servers answer in slightly different shapes; take the first time we find.
+function cfPickTime(obj) {
+  if (!obj || typeof obj !== 'object') return null;
+  const c = obj.confirmation || obj.row || {};
+  const cands = [obj.confirmed_at, obj.created_at, obj.updated_at, c.confirmed_at, c.created_at, c.updated_at];
+  for (const v of cands) {
+    if (!v) continue;
+    const d = new Date(v);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return null;
+}
+
+function cfFmtTime(d) {
+  if (!d) return '';
+  const now = new Date();
+  const sameDay = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+  const hm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  if (sameDay) return hm;
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} ${hm}`;
+}
+
+function cfNextKey() {
+  return CF_STEPS.find(k => !confState[k]) || null;
+}
+
+function cfMetaText(key) {
+  if (key === 'students') return cfCounts.students || '';
+  if (key === 'schedule' && document.getElementById('statsBar')?.style.display === 'none') return '';
+  const el = document.getElementById(key === 'freehours' ? 'fhTotal' : 'totalSessions');
+  const t = (el?.textContent || '').trim();
+  return key === 'schedule' ? t.replace(' làm việc', '') : t;
+}
 
 async function loadAllConfirmations() {
-  if (!currentWeekMonday) return;
+  const finish = () => { cfLoaded = true; renderConfirmUI(); };
+  if (!currentWeekMonday) return finish();
 
   const { data: { session } } = await client.auth.getSession();
   const token = session?.access_token;
-  if (!token) return;
+  if (!token) return finish();
 
   const headers = { 'Authorization': `Bearer ${token}` };
+  const get = (url) => fetch(url, { headers }).then(r => r.json());
 
-  // Check all 3 confirmations in parallel
-  const [fhRes, schRes, stuRes] = await Promise.allSettled([
-    fetch(`${_DO}/confirm-free-hours?weekStartDate=${currentWeekMonday}`, { headers }).then(r => r.json()),
-    fetch(`${_DO}/check-week-confirmation?weekStartDate=${currentWeekMonday}`, { headers }).then(r => r.json()),
-    fetch(`${_DO}/confirm-student-day?weekStartDate=${currentWeekMonday}`, { headers }).then(r => r.json())
+  const [fh, sch, stu] = await Promise.allSettled([
+    get(`${_DO}/confirm-free-hours?weekStartDate=${currentWeekMonday}`),
+    get(`${_DO}/check-week-confirmation?weekStartDate=${currentWeekMonday}`),
+    get(`${_DO}/confirm-student-day?weekStartDate=${currentWeekMonday}`)
   ]);
 
-  confState.freehours = !!(fhRes.status === 'fulfilled' && fhRes.value?.confirmed);
-  confState.schedule = !!(schRes.status === 'fulfilled' && schRes.value?.confirmed);
-  confState.students = !!(stuRes.status === 'fulfilled' && stuRes.value?.confirmed);
-
-  updateStepperUI();
+  const take = (key, r) => {
+    const v = r.status === 'fulfilled' ? r.value : null;
+    confState[key] = !!(v && v.confirmed);
+    cfAt[key] = confState[key] ? cfPickTime(v) : null;
+  };
+  take('freehours', fh);
+  take('schedule', sch);
+  take('students', stu);
+  finish();
 }
 
-function updateStepperUI() {
-  const steps = [
-    { key: 'freehours', el: 'confStep1', num: 'confStepNum1', status: 'confStepStatus1' },
-    { key: 'schedule',  el: 'confStep2', num: 'confStepNum2', status: 'confStepStatus2' },
-    { key: 'students',  el: 'confStep3', num: 'confStepNum3', status: 'confStepStatus3' }
-  ];
+function renderConfirmUI() {
+  const next = cfNextKey();
+  const done = CF_STEPS.filter(k => confState[k]).length;
 
-  let doneCount = 0;
-  let firstPending = -1;
+  const schedMeta = document.getElementById('cfSchedMeta');
+  if (schedMeta) schedMeta.textContent = cfMetaText('schedule');
 
-  for (let i = 0; i < steps.length; i++) {
-    const s = steps[i];
-    const el = document.getElementById(s.el);
-    const numEl = document.getElementById(s.num);
-    const statusEl = document.getElementById(s.status);
-    if (!el) continue;
+  renderRail(next, done);
+  CF_STEPS.forEach(k => renderSectionAction(k, next));
+  renderAllDone(cfLoaded && done === CF_STEPS.length);
+}
 
-    const isDone = confState[s.key];
+function renderRail(next, done) {
+  const rows = document.getElementById('cfRailRows');
+  const sub  = document.getElementById('cfRailSub');
+  const fill = document.getElementById('cfRailFill');
+  if (!rows) return;
 
-    el.classList.toggle('done', isDone);
-    el.classList.remove('active-step');
+  const total = CF_STEPS.length;
+  if (fill) fill.style.width = cfLoaded ? Math.round(done / total * 100) + '%' : '0%';
+  if (sub) {
+    sub.textContent = !cfLoaded ? 'Đang kiểm tra…'
+      : done === total ? 'Xong tuần này'
+      : `${done} / ${total} đã xác nhận · còn ${total - done}`;
+  }
 
-    if (isDone) {
-      numEl.innerHTML = '<i class="fa-solid fa-check" style="font-size:14px"></i>';
-      statusEl.textContent = 'Đã xác nhận ✓';
-      doneCount++;
+  rows.innerHTML = CF_STEPS.map((key, i) => {
+    const info = cfInfo[key];
+    const isDone = !!confState[key];
+    const isNext = cfLoaded && !isDone && next === key;
+    const isArmed = cfLoaded && cfArmed === key && cfBusy !== key;
+    const cls = ['cf-rail-row', isDone ? 'is-done' : '', isNext ? 'is-next' : '', isArmed ? 'is-armed' : ''].filter(Boolean).join(' ');
+
+    let meta = '', right = '';
+    if (!cfLoaded) {
+      meta = 'đang kiểm tra…';
+      right = '<i class="fa-solid fa-spinner fa-spin cf-rail-wait"></i>';
+    } else if (isDone) {
+      const t = cfFmtTime(cfAt[key]);
+      meta = t ? 'xác nhận lúc ' + t : 'đã xác nhận';
+      right = '<i class="fa-solid fa-check cf-rail-check"></i>';
+    } else if (cfBusy === key) {
+      meta = 'đang xác nhận…';
+      right = '<i class="fa-solid fa-spinner fa-spin cf-rail-wait"></i>';
+    } else if (isArmed) {
+      meta = 'chắc chắn?';
     } else {
-      numEl.textContent = String(i + 1);
-      statusEl.textContent = 'Nhấn để xác nhận';
-      if (firstPending === -1) firstPending = i;
+      meta = cfMetaText(key) || 'chưa xác nhận';
+      right = `<button type="button" class="cf-rail-btn${isNext ? ' primary' : ''}" data-act="arm" data-step="${key}">Xác nhận</button>`;
     }
-  }
 
-  // Highlight first pending step
-  if (firstPending >= 0) {
-    const pendingEl = document.getElementById(steps[firstPending].el);
-    if (pendingEl) pendingEl.classList.add('active-step');
-  }
+    const strip = isArmed
+      ? `<span class="cf-rail-strip"><button type="button" class="cf-arm-cancel" data-act="disarm">Hủy</button><button type="button" class="cf-arm-ok" data-act="confirm" data-step="${key}"><i class="fa-solid fa-check"></i> Tôi xác nhận</button></span>`
+      : '';
 
-  // Update progress
-  const progressEl = document.getElementById('confProgressText');
-  const stepper = document.getElementById('confStepper');
-  if (progressEl) {
-    progressEl.textContent = `${doneCount} / 3`;
-    progressEl.classList.toggle('all-done', doneCount === 3);
+    return `<div class="${cls}" role="button" tabindex="0" data-step="${key}">
+      <span class="cf-dot"></span>
+      <span class="cf-rail-text"><span class="cf-rail-name">${i + 1}. ${info.label}</span><span class="cf-rail-meta">${meta}</span>${strip}</span>
+      ${right}
+    </div>`;
+  }).join('');
+}
+
+function renderSectionAction(key, next) {
+  const info = cfInfo[key];
+  const sec  = document.getElementById(info.secId);
+  const host = document.getElementById('cfAction-' + key);
+  if (!sec || !host) return;
+
+  const isDone = !!confState[key];
+  sec.classList.toggle('is-done', isDone);
+  sec.classList.toggle('is-next', cfLoaded && !isDone && next === key);
+
+  if (!cfLoaded) {
+    host.innerHTML = '<span class="cf-checking"><i class="fa-solid fa-spinner fa-spin"></i> Đang kiểm tra…</span>';
+    return;
   }
-  if (stepper) {
-    stepper.classList.toggle('all-confirmed', doneCount === 3);
+  if (isDone) {
+    const t = cfFmtTime(cfAt[key]);
+    host.innerHTML = `<span class="cf-done"><i class="fa-solid fa-circle-check"></i> Đã xác nhận${t ? ' · ' + t : ''}</span>`;
+    return;
+  }
+  if (cfBusy === key) {
+    host.innerHTML = '<span class="cf-busy"><i class="fa-solid fa-spinner fa-spin"></i> Đang xác nhận…</span>';
+    return;
+  }
+  if (cfArmed === key) {
+    host.innerHTML = `<span class="cf-arm"><span class="cf-arm-q">Chắc chắn?</span><button type="button" class="cf-arm-cancel" data-act="disarm">Hủy</button><button type="button" class="cf-arm-ok" data-act="confirm" data-step="${key}"><i class="fa-solid fa-check"></i> Tôi xác nhận</button></span>`;
+    return;
+  }
+  host.innerHTML = `<button type="button" class="cf-confirm-btn${next === key ? ' primary' : ''}" data-act="arm" data-step="${key}"><i class="fa-solid fa-check"></i> Xác nhận</button>`;
+}
+
+function renderAllDone(all) {
+  const main = document.getElementById('cfMain');
+  if (!main) return;
+  let b = document.getElementById('cfAllDone');
+  if (all) {
+    if (!b) {
+      b = document.createElement('div');
+      b.id = 'cfAllDone';
+      b.className = 'cf-alldone';
+      b.innerHTML = '<i class="fa-solid fa-circle-check"></i><div><strong>Xong tuần này. Bạn đã xác nhận đủ 3 mục.</strong><div class="cf-alldone-sub">Có thay đổi thì vẫn gửi yêu cầu hoặc ghi chú ở từng phần như bình thường.</div></div>';
+      main.prepend(b);
+    }
+  } else if (b) {
+    b.remove();
   }
 }
 
-function setupStepperClicks() {
-  document.getElementById('confStep1')?.addEventListener('click', () => confirmStep('freehours'));
-  document.getElementById('confStep2')?.addEventListener('click', () => confirmStep('schedule'));
-  document.getElementById('confStep3')?.addEventListener('click', () => confirmStep('students'));
+function cfScrollTo(key) {
+  const info = cfInfo[key];
+  const sec = info && document.getElementById(info.secId);
+  if (!sec) return;
+  sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  sec.classList.remove('cf-flash');
+  void sec.offsetWidth;
+  sec.classList.add('cf-flash');
+  setTimeout(() => sec.classList.remove('cf-flash'), 1400);
 }
 
-const stepInfo = {
-  freehours: {
-    url: _DO + '/confirm-free-hours',
-    label: 'Giờ rảnh',
-    title: 'Xác nhận giờ rảnh',
-    msg: 'Hãy đảm bảo giờ rảnh hiện tại của bạn đã đúng và đầy đủ.<br>Nếu có thay đổi, vui lòng báo quản lý trước khi xác nhận.',
-    icon: 'fa-solid fa-clock',
-    colorClass: 'step-freehours'
-  },
-  schedule: {
-    url: _DO + '/confirm-week',
-    label: 'Lịch làm việc',
-    title: 'Xác nhận lịch làm việc',
-    msg: 'Hãy kiểm tra kỹ lịch làm việc tuần này.<br>Nếu có sai lệch, vui lòng gửi yêu cầu thay đổi trước khi xác nhận.',
-    icon: 'fa-solid fa-calendar-check',
-    colorClass: 'step-schedule'
-  },
-  students: {
-    url: _DO + '/confirm-student-day',
-    label: 'Danh sách HV',
-    title: 'Xác nhận danh sách học viên',
-    msg: 'Hãy đảm bảo HV thuộc nhóm bạn phụ trách và giờ tiếp HV đúng.<br>Nếu có sai lệch, vui lòng ghi chú trước khi xác nhận.',
-    icon: 'fa-solid fa-user-graduate',
-    colorClass: 'step-students'
+function cfArm(key, scroll) {
+  if (!key || confState[key] || cfBusy) return;
+  cfArmed = key;
+  clearTimeout(cfArmTimer);
+  cfArmTimer = setTimeout(() => { if (cfArmed === key) cfDisarm(); }, 15000);
+  renderConfirmUI();
+  if (scroll) cfScrollTo(key);
+}
+
+function cfDisarm() {
+  cfArmed = null;
+  clearTimeout(cfArmTimer);
+  renderConfirmUI();
+}
+
+async function cfConfirm(key) {
+  if (!key || confState[key] || cfBusy) return;
+  if (!currentWeekMonday) { alert('Chưa xác định được tuần. Vui lòng tải lại trang.'); return; }
+  const info = cfInfo[key];
+
+  cfBusy = key;
+  cfArmed = null;
+  clearTimeout(cfArmTimer);
+  renderConfirmUI();
+
+  try {
+    const { data: { session } } = await client.auth.getSession();
+    const token = session?.access_token;
+    if (!token) throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+
+    const res = await fetch(info.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ weekStartDate: currentWeekMonday })
+    });
+    const result = await res.json().catch(() => ({}));
+    if (!res.ok || (!result.ok && !result.confirmation && !result.confirmed)) {
+      throw new Error(result.error || ('Máy chủ trả lời ' + res.status));
+    }
+
+    confState[key] = true;
+    cfAt[key] = cfPickTime(result) || new Date();
+    showSuccessToast(`Đã xác nhận ${info.label}`);
+
+    const nextKey = cfNextKey();
+    if (nextKey) setTimeout(() => cfScrollTo(nextKey), 350);
+  } catch (e) {
+    console.error('[conf-board] confirm', key, e);
+    alert('Không xác nhận được: ' + (e.message || 'lỗi kết nối'));
+  } finally {
+    // Whatever happened, rebuild every button from the state. Nothing stays stuck.
+    cfBusy = null;
+    renderConfirmUI();
   }
-};
+}
 
-function confirmStep(stepKey) {
-  if (confState[stepKey]) return;
-  if (!currentWeekMonday) return;
+function setupRailClicks() {
+  if (window.__cfClicksWired) return;
+  window.__cfClicksWired = true;
 
-  const info = stepInfo[stepKey];
-  if (!info) return;
+  document.addEventListener('click', (e) => {
+    const act = e.target.closest('[data-act]');
+    if (act) {
+      const a = act.dataset.act;
+      const key = act.dataset.step || act.closest('.cf-rail-row')?.dataset.step || act.closest('.cf-section')?.dataset.step;
+      if (a === 'arm')     { cfArm(key, !!act.closest('.cf-rail')); return; }
+      if (a === 'disarm')  { cfDisarm(); return; }
+      if (a === 'confirm') { cfConfirm(key); return; }
+    }
+    const row = e.target.closest('.cf-rail-row');
+    if (row) cfScrollTo(row.dataset.step);
+  });
 
-  // Show popup
-  const overlay = document.getElementById('confPopupOverlay');
-  const iconEl = document.getElementById('confPopupIcon');
-  const titleEl = document.getElementById('confPopupTitle');
-  const msgEl = document.getElementById('confPopupMsg');
-  const okBtn = document.getElementById('confPopupOk');
-  const cancelBtn = document.getElementById('confPopupCancel');
-
-  iconEl.className = 'conf-popup-icon ' + info.colorClass;
-  iconEl.innerHTML = `<i class="${info.icon}"></i>`;
-  titleEl.textContent = info.title;
-  msgEl.innerHTML = info.msg;
-
-  overlay.classList.add('show');
-
-  // Clean up old listeners
-  const newOk = okBtn.cloneNode(true);
-  okBtn.parentNode.replaceChild(newOk, okBtn);
-  const newCancel = cancelBtn.cloneNode(true);
-  cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
-
-  newCancel.addEventListener('click', () => overlay.classList.remove('show'));
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.remove('show'); }, { once: true });
-
-  newOk.addEventListener('click', async () => {
-    newOk.disabled = true;
-    newOk.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xác nhận...';
-
-    try {
-      const { data: { session } } = await client.auth.getSession();
-      const token = session?.access_token;
-      if (!token) throw new Error('Vui lòng đăng nhập lại.');
-
-      const res = await fetch(info.url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ weekStartDate: currentWeekMonday })
-      });
-
-      const result = await res.json();
-      if (!res.ok || (!result.ok && !result.confirmation)) {
-        throw new Error(result.error || 'Lỗi');
-      }
-
-      confState[stepKey] = true;
-      updateStepperUI();
-      overlay.classList.remove('show');
-      showSuccessToast(`Đã xác nhận ${info.label}!`);
-
-    } catch (e) {
-      console.error(`Confirm ${stepKey} error:`, e);
-      alert('Lỗi: ' + e.message);
-      newOk.disabled = false;
-      newOk.innerHTML = '<i class="fa-solid fa-check"></i> Tôi xác nhận';
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && cfArmed) { cfDisarm(); return; }
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.classList?.contains('cf-rail-row')) {
+      e.preventDefault();
+      cfScrollTo(e.target.dataset.step);
     }
   });
 }

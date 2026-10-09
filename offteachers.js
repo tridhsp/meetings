@@ -2,13 +2,6 @@
 const _DO = '/api';
 
 let client;
-// tansinh sub-gate (9 Oct 2026): the login token for /save-temp-substitute
-async function _subAuth() {
-  try {
-    const { data: { session } } = await client.auth.getSession();
-    return session ? { 'Authorization': 'Bearer ' + session.access_token } : {};
-  } catch (e) { return {}; }
-}
 let appStarted = false;
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -842,7 +835,7 @@ async function loadExistingSubstitutes() {
     toDate.setDate(toDate.getDate() + 21);
     const toDateStr = toDate.toISOString().split('T')[0];
 
-    const res = await fetch(`${_DO}/save-temp-substitute?from_date=${fromDate}&to_date=${toDateStr}`, { headers: await _subAuth() });   // tansinh sub-gate
+    const res = await fetch(`${_DO}/save-temp-substitute?from_date=${fromDate}&to_date=${toDateStr}`);
     const out = await res.json();
     if (res.ok && out.ok) {
       existingSubstitutes = out.assignments || [];
@@ -1258,7 +1251,7 @@ async function assignSubstitute(info) {
   try {
     const res = await fetch(_DO + '/save-temp-substitute', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(await _subAuth()) },   // tansinh sub-gate
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         student_email: info.studentEmail,
         original_teacher_email: info.originalTeacherEmail,
@@ -1296,7 +1289,7 @@ async function removeSubstitute(id) {
   try {
     const res = await fetch(_DO + '/save-temp-substitute', {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json', ...(await _subAuth()) },   // tansinh sub-gate
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id })
     });
     const out = await res.json();

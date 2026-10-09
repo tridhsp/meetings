@@ -1,13 +1,6 @@
 // studentmeeting.js
 const _DO = '/api';
 let client;
-// tansinh sub-gate (9 Oct 2026): the login token for /save-temp-substitute
-async function _subAuth() {
-  try {
-    const { data: { session } } = await client.auth.getSession();
-    return session ? { 'Authorization': 'Bearer ' + session.access_token } : {};
-  } catch (e) { return {}; }
-}
 
 // NEW — guard so showApp() runs only once
 let appStarted = false;
@@ -1679,7 +1672,7 @@ async function fetchSubstitutesForStudent(studentEmail, fromYMD, toYMD) {
 
     try {
         const url = `${_DO}/save-temp-substitute?from_date=${fromYMD}&to_date=${toYMD}`;
-        const res = await fetch(url, { headers: await _subAuth() });   // tansinh sub-gate
+        const res = await fetch(url);
         if (!res.ok) return {};
 
         const out = await res.json();
