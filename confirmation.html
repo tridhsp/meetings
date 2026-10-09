@@ -11,11 +11,11 @@
   <link rel="icon" type="image/png" sizes="32x32"
     href="https://files.tansinh.info/ads/tridhsp_1752750602636_ad_tridhsp_1752750602636.png" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=20260913_1218_1544" />
+  <link rel="stylesheet" href="style.css?v=20261009_2309_1218_1544" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.4/dist/umd/supabase.js" defer></script>
-  <script src="confirmation.js?v=20260913_1218_1544" defer></script>
+  <script src="confirmation.js?v=20261009_2309_board1" defer></script>
 <script>window.addEventListener('pageshow', function(e) { if (e.persisted) location.reload(); });</script>
 
   <style>
@@ -1723,6 +1723,108 @@
     }
 
 
+    /* === tansinh conf-board v1 BEGIN (09 Oct 2026) === */
+    .confirmation-container { padding-bottom: 40px; }
+
+    .cf-layout { display: grid; grid-template-columns: 264px minmax(0, 1fr); gap: 24px; align-items: start; }
+    .cf-main { min-width: 0; }
+
+    .cf-rail { position: sticky; top: 16px; background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 16px; }
+    .cf-rail-head { padding-bottom: 12px; border-bottom: 1px solid #f1f5f9; margin-bottom: 10px; }
+    .cf-rail-title { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; color: #0f172a; }
+    .cf-rail-title i { color: #2563eb; }
+    .cf-rail-sub { font-size: 12px; color: #64748b; margin-top: 3px; }
+    .cf-rail-bar { height: 6px; background: #f1f5f9; border-radius: 3px; overflow: hidden; margin-top: 10px; }
+    .cf-rail-fill { height: 100%; width: 0; background: #22c55e; border-radius: 3px; transition: width .4s ease; }
+    .cf-rail-rows { display: flex; flex-direction: column; gap: 6px; }
+    .cf-rail-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; border: 1px solid transparent; background: #f8fafc; cursor: pointer; transition: background .15s, border-color .15s; }
+    .cf-rail-row:hover { border-color: #cbd5e1; }
+    .cf-rail-row:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+    .cf-rail-row.is-done { background: #f0fdf4; border-color: #bbf7d0; }
+    .cf-rail-row.is-next { background: #eff6ff; border-color: #bfdbfe; }
+    .cf-rail-row.is-armed { background: #fffbeb; border-color: #fde68a; }
+    .cf-dot { width: 9px; height: 9px; border-radius: 50%; background: #cbd5e1; flex-shrink: 0; }
+    .cf-rail-row.is-done .cf-dot { background: #22c55e; }
+    .cf-rail-row.is-next .cf-dot { background: #2563eb; }
+    .cf-rail-row.is-armed .cf-dot { background: #f59e0b; }
+    .cf-rail-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .cf-rail-name { font-weight: 700; font-size: 13px; color: #0f172a; }
+    .cf-rail-row.is-done .cf-rail-name { color: #15803d; }
+    .cf-rail-row.is-next .cf-rail-name { color: #1d4ed8; }
+    .cf-rail-meta { font-size: 11px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cf-rail-row.is-done .cf-rail-meta { color: #16a34a; }
+    .cf-rail-row.is-armed .cf-rail-meta { color: #b45309; font-weight: 600; }
+    .cf-rail-check { color: #16a34a; font-size: 14px; }
+    .cf-rail-wait { color: #94a3b8; font-size: 13px; }
+    .cf-rail-btn { font: inherit; font-size: 11px; font-weight: 700; padding: 5px 9px; border-radius: 8px; border: 1px solid #cbd5e1; background: #fff; color: #334155; cursor: pointer; white-space: nowrap; }
+    .cf-rail-btn:hover { border-color: #94a3b8; }
+    .cf-rail-btn.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+    .cf-rail-btn.primary:hover { background: #1d4ed8; }
+    .cf-rail-strip { display: flex; gap: 6px; margin-top: 6px; }
+    .cf-rail-hint { font-size: 11px; color: #94a3b8; margin-top: 10px; line-height: 1.5; }
+    .cf-rail-hint i { margin-right: 4px; }
+
+    .cf-section { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; margin-bottom: 20px; overflow: hidden; scroll-margin-top: 16px; transition: border-color .2s, box-shadow .2s; }
+    .cf-section.is-next { border-color: #93c5fd; box-shadow: 0 0 0 1px #93c5fd; }
+    .cf-section.is-done { border-color: #bbf7d0; }
+    .cf-section.cf-flash { box-shadow: 0 0 0 4px rgba(37, 99, 235, .18); }
+    .cf-sec-head { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid #f1f5f9; flex-wrap: wrap; }
+    .cf-section.is-done .cf-sec-head { background: #f0fdf4; border-bottom-color: #dcfce7; }
+    .cf-sec-icon { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: #f1f5f9; color: #475569; font-size: 15px; flex-shrink: 0; }
+    .cf-section.is-next .cf-sec-icon { background: #dbeafe; color: #1d4ed8; }
+    .cf-section.is-done .cf-sec-icon { background: #dcfce7; color: #15803d; }
+    .cf-sec-head h2 { margin: 0; font-size: 16px; font-weight: 700; color: #0f172a; }
+    .cf-section.is-done .cf-sec-head h2 { color: #166534; }
+    .cf-sec-meta { font-size: 12px; font-weight: 600; color: #64748b; padding: 4px 10px; background: #f1f5f9; border-radius: 9999px; }
+    .cf-sec-meta:empty { display: none; }
+    .cf-section.is-done .cf-sec-meta { background: #dcfce7; color: #166534; }
+    .cf-sec-action { margin-left: auto; display: flex; align-items: center; }
+    .cf-sec-body { padding: 18px 20px; }
+    .cf-hint { margin: 0 0 14px; font-size: 12.5px; line-height: 1.6; color: #64748b; padding: 10px 14px; background: #f8fafc; border-radius: 10px; }
+    .cf-hint i { color: #3b82f6; margin-right: 4px; }
+    .cf-empty { text-align: center; padding: 36px 20px; color: #9ca3af; font-style: italic; }
+
+    .cf-confirm-btn { font: inherit; display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 10px; border: 1px solid #cbd5e1; background: #fff; color: #334155; font-weight: 700; font-size: 13px; cursor: pointer; transition: all .15s; }
+    .cf-confirm-btn:hover { border-color: #94a3b8; background: #f8fafc; }
+    .cf-confirm-btn.primary { background: #2563eb; border-color: #2563eb; color: #fff; box-shadow: 0 2px 8px rgba(37, 99, 235, .25); }
+    .cf-confirm-btn.primary:hover { background: #1d4ed8; }
+    .cf-done { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; font-size: 13px; color: #15803d; }
+    .cf-done i { font-size: 16px; }
+    .cf-busy, .cf-checking { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: #64748b; font-weight: 600; }
+    .cf-arm { display: inline-flex; align-items: center; gap: 8px; padding: 4px 4px 4px 12px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; animation: cfArmIn .15s ease; }
+    .cf-arm-q { font-size: 13px; font-weight: 700; color: #92400e; }
+    .cf-arm-cancel { font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid #e5e7eb; background: #fff; color: #374151; font-weight: 600; font-size: 12px; cursor: pointer; }
+    .cf-arm-cancel:hover { background: #f3f4f6; }
+    .cf-arm-ok { font: inherit; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; border: none; background: #16a34a; color: #fff; font-weight: 700; font-size: 12px; cursor: pointer; }
+    .cf-arm-ok:hover { background: #15803d; }
+    @keyframes cfArmIn { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+
+    .cf-alldone { display: flex; align-items: center; gap: 14px; padding: 14px 18px; margin-bottom: 20px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 14px; color: #166534; font-size: 14px; }
+    .cf-alldone > i { font-size: 24px; color: #16a34a; }
+    .cf-alldone strong { display: block; font-weight: 700; }
+    .cf-alldone-sub { font-size: 12.5px; color: #15803d; margin-top: 2px; }
+
+    .day-group .session-row .request-change-btn { position: static; transform: none; opacity: 1; visibility: visible; margin-left: auto; background: #fff; color: #b45309; border: 1px solid #fde68a; box-shadow: none; padding: 5px 10px; font-size: 11.5px; }
+    .day-group .session-row .request-change-btn:hover { background: #fffbeb; transform: none; }
+    .day-group .session-row .request-change-btn:active { transform: none; }
+
+    @media (max-width: 900px) {
+      .cf-layout { display: block; }
+      .cf-rail { position: sticky; top: 8px; z-index: 20; padding: 10px 12px; margin-bottom: 16px; box-shadow: 0 4px 14px rgba(15, 23, 42, .08); }
+      .cf-rail-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 0 0 8px 40px; margin-bottom: 8px; }
+      .cf-rail-title { font-size: 13px; }
+      .cf-rail-sub { margin: 0 0 0 auto; }
+      .cf-rail-bar { width: 100%; margin-top: 4px; }
+      .cf-rail-rows { flex-direction: row; overflow-x: auto; gap: 6px; padding-bottom: 2px; }
+      .cf-rail-row { flex: 1 0 auto; padding: 8px 10px; }
+      .cf-rail-meta, .cf-rail-btn, .cf-rail-strip, .cf-rail-hint { display: none; }
+      .cf-section { scroll-margin-top: 118px; }
+      .cf-sec-head { padding: 12px 14px; }
+      .cf-sec-body { padding: 14px; }
+      .cf-sec-action { width: 100%; justify-content: flex-end; }
+      .day-group .session-row { flex-wrap: wrap; }
+    }
+    /* === tansinh conf-board v1 END === */
   </style>
 </head>
 
@@ -1785,65 +1887,70 @@
       
     </div>
 
-    <!-- Free Hours Section (full width, above columns) -->
-    <section class="free-hours-section">
-      <div class="free-hours-header">
-        <div class="fh-icon"><i class="fa-solid fa-clock"></i></div>
-        <h2>Giờ rảnh hiện tại</h2>
-        <span class="fh-total" id="fhTotal"></span>
-      </div>
-      <div class="free-hours-body">
-        <div id="freeHoursGrid">
-          <div class="calendar-loading">
-            <i class="fa-solid fa-spinner"></i>
-            <span>Đang tải giờ rảnh...</span>
-          </div>
-        </div>
-      </div>
-    </section>
+    <!-- === tansinh conf-board v1 layout BEGIN (09 Oct 2026) === -->
+    <div class="cf-layout" id="cfLayout">
 
-    <div class="conf-columns">
-      <div class="conf-col-left">
-    <!-- Calendar Section -->
-    <section class="calendar-section">
-      <div class="calendar-section-header">
-        <h2><i class="fa-regular fa-calendar"></i> Lịch tuần này</h2>
-        <div class="week-range-badge" id="weekRangeBadge">
-          <i class="fa-solid fa-calendar-days"></i>
-          <span id="weekRangeText">--/-- – --/--</span>
+      <aside class="cf-rail" id="cfRail" aria-label="Trạng thái xác nhận tuần này">
+        <div class="cf-rail-head">
+          <div class="cf-rail-title"><i class="fa-solid fa-calendar-week"></i><span>Tuần <span id="weekRangeText">--/-- – --/--</span></span></div>
+          <div class="cf-rail-sub" id="cfRailSub">Đang kiểm tra…</div>
+          <div class="cf-rail-bar"><div class="cf-rail-fill" id="cfRailFill"></div></div>
         </div>
-      </div>
-      <div class="calendar-section-body">
-        <div id="calendarGrid" class="week-calendar-grid">
-          <div class="calendar-loading">
-            <i class="fa-solid fa-spinner"></i>
-            <span>Đang tải lịch...</span>
-          </div>
-        </div>
-        <div class="stats-bar" id="statsBar" style="display: none;">
-          <div class="stat-item stat-total">
-            <i class="fa-solid fa-calendar-check"></i>
-            <span id="totalSessions">0 buổi làm việc</span>
-          </div>
-          <div class="stat-item stat-hours">
-            <i class="fa-solid fa-clock"></i>
-            <span id="totalHours">0 giờ</span>
-          </div>
-        </div>
-      </div>
-</section>
+        <div class="cf-rail-rows" id="cfRailRows"></div>
+        <div class="cf-rail-hint"><i class="fa-solid fa-hand-pointer"></i>Bấm một dòng để cuộn tới phần đó. Xác nhận được ở đây hoặc ở từng phần.</div>
+      </aside>
 
+      <div class="cf-main" id="cfMain">
+
+        <section class="cf-section" id="secFreehours" data-step="freehours">
+          <div class="cf-sec-head">
+            <div class="cf-sec-icon"><i class="fa-solid fa-clock"></i></div>
+            <h2>Giờ rảnh</h2>
+            <span class="cf-sec-meta" id="fhTotal"></span>
+            <div class="cf-sec-action" id="cfAction-freehours"></div>
+          </div>
+          <div class="cf-sec-body">
+            <p class="cf-hint"><i class="fa-solid fa-circle-info"></i>Giờ rảnh do quản lý cập nhật. Nếu sai, báo quản lý trước khi xác nhận.</p>
+            <div id="freeHoursGrid">
+              <div class="calendar-loading"><i class="fa-solid fa-spinner"></i><span>Đang tải giờ rảnh...</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="cf-section" id="secSchedule" data-step="schedule">
+          <div class="cf-sec-head">
+            <div class="cf-sec-icon"><i class="fa-regular fa-calendar"></i></div>
+            <h2>Lịch tuần này</h2>
+            <span class="cf-sec-meta" id="cfSchedMeta"></span>
+            <div class="cf-sec-action" id="cfAction-schedule"></div>
+          </div>
+          <div class="cf-sec-body">
+            <p class="cf-hint"><i class="fa-solid fa-circle-info"></i>Kiểm tra từng buổi. Buổi nào sai, bấm "Yêu cầu thay đổi" ở cuối dòng đó rồi mới xác nhận.</p>
+            <div id="calendarGrid" class="week-calendar-grid">
+              <div class="calendar-loading"><i class="fa-solid fa-spinner"></i><span>Đang tải lịch...</span></div>
+            </div>
+            <div class="stats-bar" id="statsBar" style="display: none;">
+              <div class="stat-item stat-total"><i class="fa-solid fa-calendar-check"></i><span id="totalSessions">0 buổi làm việc</span></div>
+              <div class="stat-item stat-hours"><i class="fa-solid fa-clock"></i><span id="totalHours">0 giờ</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="cf-section" id="secStudents" data-step="students">
+          <div class="cf-sec-head">
+            <div class="cf-sec-icon"><i class="fa-solid fa-user-graduate"></i></div>
+            <h2>Danh sách HV</h2>
+            <span class="cf-sec-meta" id="cfStudentsMeta"></span>
+            <div class="cf-sec-action" id="cfAction-students"></div>
+          </div>
+          <div class="cf-sec-body" id="myStudentsContent">
+            <div class="calendar-loading"><i class="fa-solid fa-spinner"></i><span>Đang tải danh sách HV...</span></div>
+          </div>
+        </section>
+
+      </div>
     </div>
-
-      <div class="conf-col-right">
-        <div id="myStudentsContent">
-          <div class="calendar-loading">
-            <i class="fa-solid fa-spinner"></i>
-            <span>Đang tải danh sách HV...</span>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- === tansinh conf-board v1 layout END === -->
 
     <!-- Student Note Modal -->
     <div class="sn-modal-overlay" id="snOverlay"></div>
@@ -1869,61 +1976,7 @@
       </div>
     </div>
 
-<!-- Confirmation Popup -->
-    <div class="conf-popup-overlay" id="confPopupOverlay">
-      <div class="conf-popup">
-        <div class="conf-popup-icon" id="confPopupIcon">
-          <i class="fa-solid fa-circle-question"></i>
-        </div>
-        <h3 class="conf-popup-title" id="confPopupTitle">Xác nhận</h3>
-        <p class="conf-popup-msg" id="confPopupMsg">Bạn có chắc chắn muốn xác nhận?</p>
-        <div class="conf-popup-actions">
-          <button class="conf-popup-cancel" id="confPopupCancel">Hủy</button>
-          <button class="conf-popup-ok" id="confPopupOk">
-            <i class="fa-solid fa-check"></i> Tôi xác nhận
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Unified Confirmation Stepper -->
-    <div class="conf-stepper" id="confStepper">
-      <div class="conf-stepper-inner">
-
-        <div class="conf-step" id="confStep1" data-step="freehours">
-          <div class="conf-step-num" id="confStepNum1">1</div>
-          <div class="conf-step-info">
-            <div class="conf-step-label">Giờ rảnh</div>
-            <div class="conf-step-status" id="confStepStatus1">Chưa xác nhận</div>
-          </div>
-        </div>
-
-        <i class="fa-solid fa-chevron-right conf-step-arrow"></i>
-
-        <div class="conf-step" id="confStep2" data-step="schedule">
-          <div class="conf-step-num" id="confStepNum2">2</div>
-          <div class="conf-step-info">
-            <div class="conf-step-label">Lịch làm việc</div>
-            <div class="conf-step-status" id="confStepStatus2">Chưa xác nhận</div>
-          </div>
-        </div>
-
-        <i class="fa-solid fa-chevron-right conf-step-arrow"></i>
-
-        <div class="conf-step" id="confStep3" data-step="students">
-          <div class="conf-step-num" id="confStepNum3">3</div>
-          <div class="conf-step-info">
-            <div class="conf-step-label">Danh sách HV</div>
-            <div class="conf-step-status" id="confStepStatus3">Chưa xác nhận</div>
-          </div>
-        </div>
-
-        <div class="conf-stepper-progress">
-          <span class="conf-progress-text" id="confProgressText">0 / 3</span>
-        </div>
-
-      </div>
-    </div>
+<!-- === tansinh conf-board v1: the shared pop-up and the bottom stepper were removed here === -->
 
   </div>
 

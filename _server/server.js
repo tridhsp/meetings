@@ -1054,6 +1054,7 @@ require("./routes/decuong-list.baihoc")(app);   // TSPATCH-DECUONG-20260930 the 
 require("./routes/cal-contracts.calendar")(app);  // === tc contract BEGIN (7 Oct 2026) === END ===
 require("./routes/cal-fixedhours.calendar")(app);   // tansinh fixed-blocks (8 Oct 2026)
 require("./routes/cal-offhistory.calendar")(app);   // tansinh off-history (8 Oct 2026)
+require("./routes/cal-teacher-levels.calendar")(app);   // tansinh teacher-levels (9 Oct 2026)
 app.listen(PORT, () => {
   console.log('API server running on port ' + PORT);
 });
