@@ -31,14 +31,16 @@ module.exports = function (app) {
 
       // 2) Active students
       const allStudentEmails = [...new Set(validScheds.map(s => s.student_email))];
-      const { data: hvRows } = await supabase.from('danh_sach_hv').select('email, ten_hv, status').in('email', allStudentEmails);
+      const { data: hvRows } = await supabase.from('danh_sach_hv').select('email, ten_hv, status, cap_lop_hoc').in('email', allStudentEmails);   // tansinh ca-v26: + level
 
       const activeStudents = new Set();
       const studentNameMap = {};
+      const studentMinutesMap = {}, studentLevelMap = {};       // tansinh ca-v26: like /upcoming-impacted-students
       for (const h of (hvRows || [])) {
         if (h.status === 0) continue;
         activeStudents.add(h.email);
         if (h.ten_hv) studentNameMap[h.email] = h.ten_hv;
+        studentMinutesMap[h.email] = Number(h.status || 0); studentLevelMap[h.email] = h.cap_lop_hoc || '';   // tansinh ca-v26
       }
 
       const activeScheds = validScheds.filter(s => activeStudents.has(s.student_email));
@@ -163,7 +165,8 @@ module.exports = function (app) {
           result[dow].push({
             student_email: s.student_email, student_name: studentNameMap[s.student_email] || s.student_email,
             teacher_email: s.teacher_email, teacher_name: teacherNameMap[s.teacher_email] || s.teacher_email,
-            time_local: s.time_local, role: 'TTKB', reason: tReason
+            time_local: s.time_local, role: 'TTKB', reason: tReason,
+            student_minutes: studentMinutesMap[s.student_email] || 0, student_level: studentLevelMap[s.student_email] || ''   // tansinh ca-v26
           });
         }
 
@@ -175,7 +178,8 @@ module.exports = function (app) {
             result[dow].push({
               student_email: s.student_email, student_name: studentNameMap[s.student_email] || s.student_email,
               teacher_email: s.breakout_email, teacher_name: teacherNameMap[s.breakout_email] || s.breakout_email,
-              time_local: s.time_local, role: 'Breakout', reason: bReason
+              time_local: s.time_local, role: 'Breakout', reason: bReason,
+              student_minutes: studentMinutesMap[s.student_email] || 0, student_level: studentLevelMap[s.student_email] || ''   // tansinh ca-v26
             });
           }
         }
@@ -185,7 +189,7 @@ module.exports = function (app) {
         result[dow].sort((a, b) => (a.time_local || '').localeCompare(b.time_local || ''));
       }
 
-      return res.json({ ok: true, data: result });
+      return res.json({ ok: true, data: result, week_start: mondayStr });   // tansinh ca-v26: the Monday these weekdays belong to
     } catch (err) {
       return res.status(500).json({ error: err.message || 'Server error' });
     }
