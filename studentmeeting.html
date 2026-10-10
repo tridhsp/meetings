@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="style.css?v=20261010_sb1" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.4/dist/umd/supabase.js" defer></script>
- <script src="studentmeeting.js?v=20261010_1021_2309_1218_1544" defer></script>
+ <script src="studentmeeting.js?v=20261010_smv2" defer></script>
 <script>window.addEventListener('pageshow', function(e) { if (e.persisted) location.reload(); });</script>
 
 
@@ -298,6 +298,146 @@
 }
 
 
+/* === tansinh sm-v2 BEGIN (10 Oct 2026) — "Vào lớp với ai?" layout === */
+
+/* 5 columns now: Ngày | Giờ học | Ghi chú | Vào lớp với ai? | Meeting khác */
+#studentMeetingRoot .roster {
+  grid-template-columns: 90px 90px 110px minmax(360px, 1.5fr) minmax(280px, 1fr);
+}
+@media (max-width: 720px) {
+  #studentMeetingRoot .roster {
+    grid-template-columns: 72px 88px 110px minmax(300px, 1.4fr) minmax(240px, 1fr);
+  }
+}
+/* the old 6-column border trick no longer lines up; the last cell removes its own border */
+#studentMeetingRoot .roster__cell:nth-child(6n) { border-right: 1px solid #f1f5f9; }
+#studentMeetingRoot .roster__cell.roster__cell--other { border-right: none; }
+
+/* the two answer cells: content fills the width and starts at the top */
+#studentMeetingRoot .roster__cell.roster__cell--main,
+#studentMeetingRoot .roster__cell.roster__cell--other {
+  align-items: stretch;
+  justify-content: flex-start;
+  padding: 14px 12px;
+  gap: 0;
+}
+#studentMeetingRoot .roster__cell.roster__cell--main .tmc-card,
+#studentMeetingRoot .roster__cell.roster__cell--other .tmc-card { margin-top: 6px; }
+
+/* help line under the title */
+.sm-help {
+  margin: -4px 0 14px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e3a8a;
+  font-size: 13px;
+  line-height: 1.5;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.sm-help i { color: #2563eb; margin-top: 3px; flex-shrink: 0; }
+.sm-help b { color: #1d4ed8; }
+.sm-help a { color: #1d4ed8; font-weight: 700; }
+
+/* date under the day name, and the "nearest day" pill */
+.sm-date { display: block; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: .2px; }
+#studentMeetingRoot .roster__day.day-today.day-nearest::after { content: 'GẦN NHẤT'; background: #e0f2fe; color: #0369a1; }
+
+/* the status strip: one coloured sentence per class slot */
+.sm-strip {
+  display: flex; gap: 8px; align-items: flex-start;
+  padding: 9px 12px; border-radius: 10px;
+  font-size: 13px; line-height: 1.45; font-weight: 500;
+  margin-bottom: 4px; border: 1px solid transparent;
+}
+.sm-strip i { margin-top: 2px; flex-shrink: 0; }
+.sm-strip b { font-weight: 800; }
+.sm-strip--ok       { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
+.sm-strip--soon     { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+.sm-strip--sub      { background: #f5f3ff; border-color: #ddd6fe; color: #5b21b6; }
+.sm-strip--assigned { background: #fff1f2; border-color: #fecdd3; color: #9f1239; }
+.sm-strip--fallback { background: #fff7ed; border-color: #fed7aa; color: #9a3412; }
+.sm-strip--call     { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+.sm-strip--info     { background: #f8fafc; border-color: #e2e8f0; color: #64748b; }
+.sm-strip--off      { background: #f1f5f9; border-color: #e2e8f0; color: #475569; }
+
+/* labelled groups of cards */
+.sm-section { margin-top: 8px; }
+.sm-section__label {
+  font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px;
+  color: #64748b; margin: 0 0 0 2px; display: flex; align-items: center; gap: 5px;
+}
+.sm-section--assigned .sm-section__label { color: #be123c; }
+.sm-section--sub      .sm-section__label { color: #7c3aed; }
+.sm-section--fallback .sm-section__label { color: #c2410c; }
+.sm-section--main     .sm-section__label { color: #4338ca; }
+.sm-section--breakout .sm-section__label { color: #0f766e; }
+.sm-section--other    .sm-section__label { color: #c2410c; }
+
+/* the call-for-support badge */
+.sm-call {
+  margin-top: 8px; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid #fecaca; background: linear-gradient(180deg, #fef2f2, #fff);
+}
+.sm-call--soft { border-color: #e2e8f0; background: linear-gradient(180deg, #f8fafc, #fff); }
+.sm-call__text { font-size: 13px; color: #7f1d1d; font-weight: 600; line-height: 1.45; margin-bottom: 8px; }
+.sm-call__text i { color: #dc2626; margin-right: 4px; }
+.sm-call--soft .sm-call__text { color: #334155; }
+.sm-call--soft .sm-call__text i { color: #64748b; }
+.sm-call__btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 16px; border-radius: 999px;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #fff !important; font-weight: 800; font-size: 13px;
+  text-decoration: none !important;
+  box-shadow: 0 3px 10px rgba(220, 38, 38, .3);
+  animation: smCallPulse 2s ease-in-out infinite;
+  transition: transform .15s ease;
+}
+.sm-call__btn:hover { transform: translateY(-1px); }
+.sm-call--soft .sm-call__btn {
+  background: linear-gradient(135deg, #4f8cff, #6c5ce7);
+  box-shadow: 0 3px 10px rgba(108, 92, 231, .3);
+  animation: none;
+}
+@keyframes smCallPulse {
+  0%, 100% { box-shadow: 0 3px 10px rgba(220, 38, 38, .3); }
+  50%      { box-shadow: 0 3px 18px rgba(220, 38, 38, .55); }
+}
+.sm-call__hint { margin-top: 8px; font-size: 11.5px; color: #64748b; line-height: 1.4; }
+
+/* a teacher we cannot send the learner to: red = off, grey = no room */
+#studentMeetingRoot .sm-offcard { opacity: .95; border-color: #fecaca; background: linear-gradient(180deg, #fef2f2 0%, #fff 60%); }
+#studentMeetingRoot .sm-offcard:hover { border-color: #fca5a5; }
+#studentMeetingRoot .sm-offcard--noroom { border-color: #e2e8f0; background: linear-gradient(180deg, #f8fafc 0%, #fff 60%); }
+#studentMeetingRoot .sm-offcard__avatar { background: #fee2e2; color: #b91c1c; }
+#studentMeetingRoot .sm-offcard--noroom .sm-offcard__avatar { background: #e2e8f0; color: #475569; }
+#studentMeetingRoot .sm-offcard__status { color: #b91c1c; }
+#studentMeetingRoot .sm-offcard--noroom .sm-offcard__status { color: #475569; }
+#studentMeetingRoot .sm-offcard__dot { background: #dc2626; animation: none; }
+#studentMeetingRoot .sm-offcard--noroom .sm-offcard__dot { background: #94a3b8; }
+
+/* planned (not today) rows */
+.sm-plan { padding: 6px 2px 2px; }
+.sm-plan__line { font-size: 13px; color: #1e293b; line-height: 1.7; }
+.sm-plan__who { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; color: #64748b; margin-right: 4px; }
+.sm-plan__line--off { color: #9a3412; }
+.sm-plan__line--sub { color: #5b21b6; }
+.sm-tag { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 700; margin-left: 4px; vertical-align: middle; }
+.sm-tag--off { background: #fee2e2; color: #b91c1c; }
+.sm-tag--sub { background: #ede9fe; color: #6d28d9; }
+
+.sm-slot-sep { height: 1px; background: #e2e8f0; margin: 10px 0; }
+.sm-muted { font-size: 12px; color: #94a3b8; font-style: italic; }
+.sm-note { font-size: 12px; color: #9a3412; margin: 8px 2px 0; display: flex; gap: 6px; align-items: flex-start; }
+.sm-note i { margin-top: 2px; }
+.sm-empty { grid-column: 1 / -1; padding: 24px; background: #fff; }
+
+/* === tansinh sm-v2 END === */
+
 </style>
 
 </head>
@@ -324,6 +464,15 @@
   <!-- Page content (hidden until logged in) -->
   <div class="meeting-list" id="studentMeetingRoot" style="margin-top:18px; display:none;">
    <h2 class="section-title">Lịch học của bạn</h2>
+<!-- === tansinh sm-v2 BEGIN (10 Oct 2026) === -->
+<p class="sm-help" id="smHelp">
+  <i class="fa-solid fa-circle-info"></i>
+  <span>Mỗi hàng là một buổi học của bạn. Cột <b>Vào lớp với ai?</b> cho biết hôm nay bạn nên bấm vào meeting của giáo viên nào.
+  Nếu GV phụ trách nghỉ, hệ thống tự hiện <b>GV Breakout</b> hoặc <b>GV dạy thay</b> của bạn.
+  Không thấy giáo viên nào? Bấm <a href="https://ringts.tansinh.info/" target="_blank" rel="noopener noreferrer">Gọi hỗ trợ</a> — chúng tôi sẽ xếp lớp cho bạn ngay.</span>
+</p>
+<!-- === tansinh sm-v2 END === -->
+
 <div id="scheduleGrid" aria-live="polite"></div>
 
   </div>
