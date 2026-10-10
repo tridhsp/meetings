@@ -342,7 +342,7 @@ function setupRealtimeSubscriptions(studentEmail) {
             { event: '*', schema: 'public', table: 'meeting_links' },
             (payload) => {
                 const changed = (payload.new?.teacher_email || payload.old?.teacher_email || '').toLowerCase();
-                if (changed && myTeacherEmails.has(changed)) reloadScheduleDebounced();
+                if (changed && (myTeacherEmails.has(changed) || smV4OnDutyEmails.includes(changed))) reloadScheduleDebounced(); // sm-v4
             }
         );
 
@@ -351,7 +351,7 @@ function setupRealtimeSubscriptions(studentEmail) {
             { event: '*', schema: 'public', table: 'meeting_content' },
             (payload) => {
                 const changed = (payload.new?.teacher_email || payload.old?.teacher_email || '').toLowerCase();
-                if (changed && myTeacherEmails.has(changed)) reloadScheduleDebounced();
+                if (changed && (myTeacherEmails.has(changed) || smV4OnDutyEmails.includes(changed))) reloadScheduleDebounced(); // sm-v4
             }
         );
 
@@ -360,7 +360,7 @@ function setupRealtimeSubscriptions(studentEmail) {
             { event: '*', schema: 'public', table: 'meeting_offdays' },
             (payload) => {
                 const changed = (payload.new?.teacher_email || payload.old?.teacher_email || '').toLowerCase();
-                if (changed && myTeacherEmails.has(changed)) reloadScheduleDebounced();
+                if (changed && (myTeacherEmails.has(changed) || smV4OnDutyEmails.includes(changed))) reloadScheduleDebounced(); // sm-v4
             }
         );
 
@@ -1402,10 +1402,10 @@ function renderTiepHvMeetingCard(meeting, studentEmail, teacherName, teacherEmai
 
 // Smart poll: only fetch breakout room counts, reload page only if availability changed
 async function pollBreakoutRooms() {
-    if (!myBreakoutEmails.length) return; // no breakout teachers → nothing to poll
+    const pollEmails = smV4PollEmails(); if (!pollEmails.length) return; // sm-v4: own breakout teachers + the on-duty ones shown
     try {
         const allRoomNames = [];
-        for (const btEmail of myBreakoutEmails) {
+        for (const btEmail of pollEmails) { // sm-v4
             const rooms = await fetchAvailableBreakoutRooms(btEmail);
             for (const r of rooms) {
                 allRoomNames.push(r.room_name);
@@ -1590,6 +1590,24 @@ const SM_V3 = {
                                         // shift today (working now, or starting later). false = offer them
                                         // anyway when they have a room, with an honest note under the card.
 };
+// === tansinh sm-v4 config BEGIN (10 Oct 2026) — GV Breakout đang trực ===
+// When NONE of the learner's own teachers is working right now, the live day
+// also shows the Breakout/BM teachers who are on shift now, with their free
+// rooms. The code is in the sm-v4 block at the end of this file.
+const SM_V4 = {
+    ENABLED: true,      // one-word switch: false = the page behaves exactly as sm-v3
+    ROLE_BASED: true,   // true  = show the on-duty Breakout teacher whenever none of her own
+                        //         BREAKOUT-role teachers is live, even if a TTKB answer exists
+                        // false = any live teacher of hers (TTKB included) hides it
+    MAX_CHECK: 6,       // how many on-duty teachers to ask for free rooms (one API call each)
+    MAX_SHOW: 3         // how many of them to show, most free rooms first
+};
+// sm-v5: the two-tile look for today's card (Lớp chính / Phòng Breakout)
+const SM_V5 = {
+    ENABLED: true,      // one-word switch: false = today's card renders as the sm-v3 sections
+    MAX_ROOMS: 12       // room buttons shown in the Breakout tile
+};
+// === tansinh sm-v4 config END ===
 
 // Next date (today or later) that falls on weekday dow (0=Sun..6=Sat)
 function smNextYMDForDow(dow, todayYMD) {
@@ -2056,6 +2074,57 @@ async function smRenderLiveDay(ctx, items, dbDay) {
             blocks.push(`<div class="sm-note"><i class="fa-solid fa-user-slash"></i> ${smWhyNot(mainSt, mainName, classTime, relaxed)}</div>`);
         }
 
+        // === tansinh sm-v4 hook BEGIN (10 Oct 2026) — GV Breakout đang trực ===
+        // Shown ONCE per day, at the first slot where nobody of the learner's OWN
+        // Breakout-role teachers is working RIGHT NOW: her breakout teacher(s), a
+        // breakout substitute, a pinned meeting whose owner is a Breakout/BM
+        // teacher, or — on a "buổi phụ" row — the row's own teacher. A TTKB answer
+        // (pinned TTKB meeting, TTKB substitute, live TTKB teacher) does NOT hide it
+        // while SM_V4.ROLE_BASED is true. Own teachers that start later today stay
+        // on screen; the on-duty teacher is added as the "right now" answer.
+        if (i === 0) smV4OnDutyEmails = [];
+        if (SM_V4.ENABLED && !ctx._smV4Shown && !ctx._smV4AnyLive) {
+            try {
+                const smV4SubSt = (sub && subCard && subCard.joinable)
+                    ? await statusOf(smLower(sub.substitute_teacher_email), sub.substitute_teacher_name || '', classTime, false)
+                    : null;
+                const smV4SubLive = !!(smV4SubSt && smV4SubSt.workingNow);
+                const smV4MainLive = !!(mainCard && mainCard.joinable && mainSt && mainSt.workingNow);
+                const smV4MainIsB = isAux || breakoutEmails.includes(mainEmail);
+                let smV4Covered;
+                if (SM_V4.ROLE_BASED) {
+                    smV4Covered = await smV4AssignedBreakoutLive(ctx)
+                        || (isAux && smV4SubLive)
+                        || (smV4MainIsB && smV4MainLive)
+                        || await smV4OwnBreakoutLive(ctx, { item, breakoutEmails, brSub, mainEmail, isAux, classTime, statusOf, cardOf });
+                } else {
+                    smV4Covered = !!assignedHtml || smV4SubLive || smV4MainLive
+                        || await smV4OwnBreakoutLive(ctx, { item, breakoutEmails, brSub, mainEmail, isAux, classTime, statusOf, cardOf });
+                }
+                if (smV4Covered) {
+                    ctx._smV4AnyLive = true;
+                } else {
+                    const smV4Skip = new Set([mainEmail, ...breakoutEmails, ...usedBreakout,
+                        ...(ctx.assignedOwnersToday || []).map(smLower)].filter(Boolean));
+                    if (sub) smV4Skip.add(smLower(sub.substitute_teacher_email));
+                    if (brSub) smV4Skip.add(smLower(brSub.substitute_teacher_email));
+                    const od = await smV4OnDutySection(ctx, smV4Skip);
+                    if (od.count) {
+                        ctx._smV4Shown = true;
+                        smV4OnDutyEmails = od.emails;
+                        // the call-for-support badge is no longer the answer for this slot
+                        for (let k = blocks.length - 1; k >= 0; k--) {
+                            if (String(blocks[k]).indexOf('<div class="sm-call') === 0) blocks.splice(k, 1);
+                        }
+                        blocks.push(od.html);
+                        strip = smV4Strip(strip, { answered, relaxed, isAux, mainSt, mainName, classTime, count: od.count, DB_DAY_LABELS, todayDOW, todayYMD });
+                    }
+                }
+            } catch (e) {
+                console.error('[sm-v4] on-duty block error', e);
+            }
+        }
+        // === tansinh sm-v4 hook END ===
         if (!strip) strip = smStripHTML('info', `Hãy chọn một meeting bên dưới để vào lớp.`);
         slotBlocks.push({ item, strip, blocks: blocks.join('') });
     }
@@ -2160,6 +2229,7 @@ function smAgPlannedBody(ctx, items, rowYMD, offWindow) {
 
 // ---------- the TODAY row: expanded card(s) from the resolver ----------
 async function smAgTodayBody(ctx, items, dbDay, noClass) {
+    if (typeof SM_V5 !== 'undefined' && SM_V5.ENABLED) { const v5 = await smV5TodayBody(ctx, items, dbDay, noClass); if (v5 != null) return v5; } // sm-v4: the two-tile look (sm-v5); on an error it falls through to the sections below
     const { DB_DAY_LABELS, todayYMD } = ctx;
     let out;
     try {
@@ -2235,3 +2305,533 @@ async function renderScheduleRowsV2(ctx) {
     return html;
 }
 // === tansinh sm-v3 END ===
+// === tansinh sm-v4 BEGIN (10 Oct 2026) — GV Breakout đang trực ===
+// The fallback the sm-v3 rewrite lost: when nobody of the learner's own teachers
+// is working right now, show the Breakout/BM teachers who are on shift now.
+// Reuses fetchFallbackTeachersNow (shift covers now, not off today),
+// fetchAvailableBreakoutRooms, fetchTiepHvMeeting, renderBreakoutRoomChips,
+// renderTiepHvMeetingCard, smFillNames, smSectionHTML and smStripHTML.
+// Config: SM_V4, next to SM_V3. Switch off with SM_V4.ENABLED = false.
+
+// emails of the on-duty teachers shown in the last render; the 30-second room
+// poll and the realtime handlers watch them too (see pollBreakoutRooms)
+let smV4OnDutyEmails = [];
+
+function smV4PollEmails() {
+    const seen = new Set();
+    return [...myBreakoutEmails, ...smV4OnDutyEmails].map(smLower).filter(e => {
+        if (!e || seen.has(e)) return false;
+        seen.add(e);
+        return true;
+    });
+}
+
+// Is one of today's pinned meetings owned by a Breakout/BM teacher? (A pinned
+// meeting counts as live — smAssignedHTML treats its owner as working now.)
+async function smV4AssignedBreakoutLive(ctx) {
+    for (const ow of (ctx.assignedOwnersToday || [])) {
+        const d = String(await getTeacherDepartment(ctx.client, ow) || '').toLowerCase();
+        if (d === 'bm' || d.includes('breakout')) return true;
+    }
+    return false;
+}
+
+// Is any of the learner's OWN breakout teachers (this slot's, the others in her
+// schedule, a breakout substitute) working right now with a joinable card?
+async function smV4OwnBreakoutLive(ctx, o) {
+    const { nameByTeacher } = ctx;
+    const own = [smLower(o.item.breakout_email), ...o.breakoutEmails]
+        .filter((e, i, a) => e && a.indexOf(e) === i && e !== o.mainEmail);
+    const cands = own.map(be => ({ em: be, name: (nameByTeacher[be] || '').trim() || be, label: 'Breakout' }));
+    if (o.brSub && !o.isAux) {
+        const se = smLower(o.brSub.substitute_teacher_email);
+        if (se && !cands.some(c => c.em === se)) {
+            cands.push({ em: se, name: o.brSub.substitute_teacher_name || nameByTeacher[se] || se, label: 'Breakout dạy thay' });
+        }
+    }
+    for (const c of cands) {
+        const st = await o.statusOf(c.em, c.name, o.classTime, false);
+        if (!smAvailable(st) || !st.workingNow) continue;
+        const card = await o.cardOf(c.em, c.name, 'breakout', st, c.label);
+        if (card.joinable) return true;
+    }
+    return false;
+}
+
+// The shift that covers "now" for this teacher today (same date rules as
+// getTeacherUpcomingShiftsToday, same 20-minute tail as fetchFallbackTeachersNow).
+async function smV4ShiftNow(client, teacherEmail, todayDOW) {
+    const em = smLower(teacherEmail);
+    if (!em) return null;
+    try {
+        const { data } = await client.from('meeting_content')
+            .select('start_time, end_time, work_date, is_one_time')
+            .ilike('teacher_email', em);
+        const now = new Date();
+        const nowMin = now.getHours() * 60 + now.getMinutes();
+        const todayYMD = thisWeekYMDForDow(Number(todayDOW));
+        for (const r of (data || [])) {
+            const isOne = r.is_one_time === true || r.is_one_time === 1 ||
+                String(r.is_one_time).toLowerCase() === 'true' || String(r.is_one_time).toLowerCase() === 't';
+            const rowYMD = String(r.work_date).slice(0, 10);
+            const dateOk = isOne ? (rowYMD === todayYMD) : (weekdayFromYMD(r.work_date) === Number(todayDOW));
+            if (!dateOk) continue;
+            const s = toMinutes(r.start_time);
+            const e = toMinutes(r.end_time);
+            if (nowMin >= s && nowMin < Math.min(e + 20, 24 * 60)) return { start: timeHHMM(r.start_time), end: timeHHMM(r.end_time) };
+        }
+    } catch (e) {
+        console.error('[sm-v4] shift lookup error', e);
+    }
+    return null;
+}
+
+// "đang làm việc" -> "đang trực · ca 08:00–12:00" on a card we did not write
+function smV4Decorate(cardHtml, shift) {
+    const tail = shift ? ` <span class="sm-onduty__shift"><i class="fa-regular fa-clock"></i> ca ${wmEscape(shift.start)}–${wmEscape(shift.end)}</span>` : '';
+    return String(cardHtml).replace('GV Breakout — đang làm việc', 'GV Breakout — đang trực' + tail);
+}
+
+// The on-duty candidates, as DATA: Breakout/BM teachers on shift now, not off,
+// not in `skip`, with their free rooms (most rooms first). If nobody has a free
+// room, the first ones with a main meeting, marked noRooms. Up to SM_V4.MAX_SHOW.
+async function smV4OnDutyPick(ctx, skip) {
+    const { client, nameByTeacher, todayDOW } = ctx;
+    const list = await fetchFallbackTeachersNow(client, ['breakout', 'bm']);
+    const cands = [];
+    for (const t of (list || [])) {
+        const em = smLower(t.teacher_email);
+        if (!em || skip.has(em) || cands.some(c => c.em === em)) continue;
+        cands.push({ em, name: (t.teacher_name || '').trim() });
+        if (cands.length >= SM_V4.MAX_CHECK) break;
+    }
+    if (!cands.length) return [];
+    await smFillNames(client, nameByTeacher, cands.map(c => c.em));
+    const withRooms = [];
+    const noRooms = [];
+    for (const c of cands) {
+        c.name = (nameByTeacher[c.em] || '').trim() || c.name || c.em;
+        c.rooms = await fetchAvailableBreakoutRooms(c.em);
+        c.mainRoom = '';
+        c.noRooms = !c.rooms.length;
+        (c.rooms.length ? withRooms : noRooms).push(c);
+    }
+    withRooms.sort((a, b) => b.rooms.length - a.rooms.length);
+    const picked = withRooms.slice(0, SM_V4.MAX_SHOW);
+    if (!picked.length) {
+        for (const c of noRooms.slice(0, SM_V4.MAX_SHOW)) {
+            const m = await fetchTiepHvMeeting(c.em);
+            if (m && m.room_name) { c.mainRoom = m.room_name; picked.push(c); }
+        }
+    }
+    for (const c of picked) c.shift = await smV4ShiftNow(client, c.em, todayDOW);
+    return picked;
+}
+
+// The sm-v3-style section built from the pick. Returns { count, html, emails }.
+async function smV4OnDutySection(ctx, skip) {
+    const { studentEmail } = ctx;
+    const out = { count: 0, html: '', emails: [] };
+    const picked = await smV4OnDutyPick(ctx, skip);
+    const cards = [];
+    for (const c of picked) {
+        if (!c.noRooms) {
+            cards.push(smV4Decorate(renderBreakoutRoomChips(c.rooms, studentEmail, c.name, c.em, false, []), c.shift));
+        } else {
+            cards.push(smV4Decorate(renderTiepHvMeetingCard({ room_name: c.mainRoom }, studentEmail, c.name, c.em, false, [], 'Breakout'), c.shift)
+                + `<div class="sm-onduty__note"><i class="fa-solid fa-circle-info"></i> Phòng Breakout của GV này đang kín. Vào <b>Meeting chính</b> và chờ GV mời bạn vào phòng.</div>`);
+        }
+    }
+    if (!cards.length) return out;
+    out.count = cards.length;
+    out.emails = picked.map(c => c.em);
+    out.html = smSectionHTML('onduty', `<i class="fa-solid fa-door-open"></i> GV Breakout đang trực lúc này`,
+        cards.join('')
+        + `<div class="sm-onduty__note"><i class="fa-solid fa-circle-info"></i> Đây không phải GV Breakout thường ngày của bạn — hôm nay bạn vào tạm. Nếu vào phòng mà không có ai, bấm <b>Gọi hỗ trợ</b> ở đầu trang.</div>`);
+    return out;
+}
+
+// The one-line explanation above the card. Three situations:
+//   someone of hers answers later today (or her own breakout teacher has a
+//   room but is not live yet)  -> keep that sentence, add the offer
+//   no class today             -> calm info line
+//   nobody of hers can take her -> why, then the offer (or "class is over")
+function smV4Strip(oldStrip, o) {
+    const where = `Hãy vào tạm với <b>GV Breakout đang trực</b> bên dưới${o.count > 1 ? ' (chọn một trong ' + o.count + ' GV)' : ''}.`;
+    const kind = (String(oldStrip || '').match(/sm-strip--([a-z]+)/) || [])[1] || '';
+    if ((o.answered || kind === 'fallback') && oldStrip) {
+        // a TTKB answer exists (pinned / substitute / main teacher), or her own breakout
+        // teacher has a room but is not live yet: keep that sentence, add the Breakout offer
+        const extra = (SM_V4.ROLE_BASED && !o.isAux && kind !== 'fallback')
+            ? `GV Breakout của bạn không làm việc lúc này — khi cần phòng Breakout, ${where.charAt(0).toLowerCase() + where.slice(1)}`
+            : `Muốn học ngay bây giờ? ${where}`;
+        return String(oldStrip).replace(/<\/span><\/div>$/, ` ${extra}</span></div>`);
+    }
+    if (o.relaxed) {
+        return smStripHTML('info', `Hôm nay (<b>${wmEscape(o.DB_DAY_LABELS[o.todayDOW])} ${smDDMM(o.todayYMD)}</b>) bạn không có lịch học. Muốn học ngay bây giờ? ${where}`);
+    }
+    const why = smWhyNot(o.mainSt, o.mainName, o.classTime, o.relaxed);
+    const d = new Date();
+    const nowMin = d.getHours() * 60 + d.getMinutes();
+    const classOver = (nowMin - toMinutes(o.classTime)) >= 120 || !!(o.mainSt && o.mainSt.ended && !o.mainSt.off);
+    if (classOver) return smStripHTML('off', `${why} Buổi học lúc <b>${wmEscape(o.classTime)}</b> hôm nay đã qua giờ. Muốn học thêm? ${where}`);
+    return smStripHTML('fallback', `${why} GV Breakout của bạn cũng không làm việc lúc này. ${where}`);
+}
+
+// ---------- sm-v5: the two-tile look for today's card (Lớp chính / Phòng Breakout) ----------
+// smAgTodayBody routes here while SM_V5.ENABLED. One guide sentence on top, two
+// tiles with one button each, a help line, and the next class. Any error falls
+// back to the sm-v3 sections (the routing line checks for null).
+
+function smV5Url(roomName, studentEmail) {
+    let url = 'https://meeting.tansinh.info/' + roomName;
+    if (studentEmail) {
+        url += '#userInfo.email=%22' + encodeURIComponent(studentEmail) + '%22'
+            + '&userInfo.displayName=%22' + encodeURIComponent(studentEmail) + '%22';
+    }
+    return url;
+}
+
+function smV5RoomNum(roomName) {
+    const parts = String(roomName || '').split('_');
+    return parts[parts.length - 1];
+}
+
+// short reason for a tile line
+function smV5Why(st, classTime, strict) {
+    if (!st) return 'chưa có GV';
+    if (st.off) return 'nghỉ hôm nay';
+    if (st.noShift) return 'chưa có lịch hôm nay';
+    if (strict && !st.slotOk) return 'không có lịch lúc ' + classTime;
+    if (st.ended) return 'đã xong ca hôm nay';
+    if (!st.workingNow && st.upcoming && st.upcoming.length) return 'bắt đầu lúc ' + st.upcoming[0].start;
+    return 'hiện không làm việc';
+}
+
+async function smV5Rooms(email, studentEmail) {
+    const rooms = await fetchAvailableBreakoutRooms(email);
+    return rooms.map(r => ({ room_name: r.room_name, num: smV5RoomNum(r.room_name), url: smV5Url(r.room_name, studentEmail) }))
+        .sort((a, b) => ((Number(a.num) || 0) - (Number(b.num) || 0)) || String(a.num).localeCompare(String(b.num)))
+        .slice(0, SM_V5.MAX_ROOMS);
+}
+
+// Everything a tile needs about one teacher. kind: 'ttkb' | 'breakout'
+async function smV5Teacher(ctx, email, name, kind, st, mainRoom) {
+    const em = smLower(email);
+    const t = { email: em, name: String(name || '').trim() || em, kind, st, mainUrl: '', rooms: [], shift: null, joinable: false };
+    if (!em) return t;
+    const m = mainRoom ? { room_name: mainRoom } : await fetchTiepHvMeeting(em);
+    if (kind === 'breakout') {
+        t.rooms = await smV5Rooms(em, ctx.studentEmail);
+        t.mainUrl = (m && m.room_name) ? smV5Url(m.room_name, ctx.studentEmail) : (t.rooms.length ? smV5Url(em.split('@')[0], ctx.studentEmail) : '');
+    } else {
+        t.mainUrl = (m && m.room_name) ? smV5Url(m.room_name, ctx.studentEmail) : '';
+    }
+    t.joinable = !!t.mainUrl || t.rooms.length > 0;
+    return t;
+}
+
+// "Thứ hai 12/10 · 19:00 · GV Vy Dang Tran Phuong" — the next class after now
+function smV5NextClass(ctx) {
+    const { data, todayYMD, DB_DAY_LABELS, nameByTeacher } = ctx;
+    const d = new Date();
+    const nowMin = d.getHours() * 60 + d.getMinutes();
+    let best = null;
+    for (const r of (data || [])) {
+        const time = timeHHMM(r.time_local);
+        let ymd = smNextYMDForDow(Number(r.day_of_week), todayYMD);
+        if (ymd === todayYMD && toMinutes(time) <= nowMin) ymd = smAddDays(ymd, 7);
+        const key = ymd + ' ' + time;
+        if (!best || key < best.key) {
+            const em = smLower(r.teacher_email);
+            best = { key, ymd, dow: Number(r.day_of_week), time, teacher: (nameByTeacher[em] || '').trim() || em };
+        }
+    }
+    if (!best) return '';
+    return `${wmEscape(DB_DAY_LABELS[best.dow])} ${smDDMM(best.ymd)} · ${wmEscape(best.time)}${best.teacher ? ' · GV ' + wmEscape(best.teacher) : ''}`;
+}
+
+// Decide who goes in each tile. Same cascade as sm-v3/v4, as data:
+//   Lớp chính:      pinned TTKB meeting → TTKB substitute → own teacher of the slot
+//   Phòng Breakout: pinned BM meeting → breakout substitute → own breakout teacher
+//                   live now → on-duty teacher (sm-v4) → own breakout teacher later today
+async function smV5Resolve(ctx, items, dbDay, noClass) {
+    const { client, data, nameByTeacher, todayYMD, todayDOW, studentEmail } = ctx;
+    const relaxed = !!noClass;
+    const d0 = new Date();
+    const nowMin = d0.getHours() * 60 + d0.getMinutes();
+    const subs = ctx.substitutesByDate[todayYMD] || {};
+    const ttkbSub = (subs.TTKB && subs.TTKB.substitute_teacher_email) ? subs.TTKB : null;
+    const brSub = (subs.Breakout && subs.Breakout.substitute_teacher_email) ? subs.Breakout : null;
+    const nameOf = (em) => (nameByTeacher[em] || '').trim() || em;
+    const stCache = new Map();
+    const statusOf = async (em, classTime, strict) => {
+        const key = `${em}|${classTime}|${strict ? 1 : 0}`;
+        if (!stCache.has(key)) stCache.set(key, await smTeacherStatusToday(ctx, em, nameOf(em), classTime, strict));
+        return stCache.get(key);
+    };
+    const LIVE = { off: false, slotOk: true, workingNow: true, upcoming: [], ended: false, anyToday: true, noShift: false };
+
+    const mainSlots = items.filter(r => r.buoi_phu !== true);
+    const auxSlots = items.filter(r => r.buoi_phu === true);
+    const firstSlot = mainSlots[0] || items[0] || null;
+    const classTime = firstSlot ? timeHHMM(firstSlot.time_local) : '';
+    const ownBreakout = [...new Set([
+        ...items.map(r => smLower(r.breakout_email)),
+        ...auxSlots.map(r => smLower(r.teacher_email))
+    ].filter(Boolean))];
+    const ownTtkb = [...new Set(mainSlots.map(r => smLower(r.teacher_email)).filter(Boolean))];
+
+    // pinned meetings, split by the owner's department
+    const pinnedT = [];
+    const pinnedB = [];
+    for (const ow of (ctx.assignedOwnersToday || [])) {
+        const em = smLower(ow);
+        if (!em) continue;
+        const d = String(await getTeacherDepartment(client, em) || '').toLowerCase();
+        ((d === 'bm' || d.includes('breakout')) ? pinnedB : pinnedT).push(em);
+    }
+
+    // ---- Lớp chính
+    const main = { kind: 'none', t: null, why: '', time: relaxed ? '' : classTime, notYet: false };
+    if (pinnedT.length) {
+        main.kind = 'pinned';
+        main.t = await smV5Teacher(ctx, pinnedT[0], nameOf(pinnedT[0]), 'ttkb', LIVE);
+    } else if (ttkbSub) {
+        const se = smLower(ttkbSub.substitute_teacher_email);
+        const st = await statusOf(se, classTime || smNowHHMM(), false);
+        const t = await smV5Teacher(ctx, se, ttkbSub.substitute_teacher_name || nameOf(se), 'ttkb', st);
+        if (!st.off && t.joinable && (st.workingNow || st.upcoming.length)) {
+            main.kind = 'sub'; main.t = t; main.notYet = !st.workingNow;
+        } else {
+            main.why = `GV dạy thay ${t.name} ${smV5Why(st, classTime, false)}`;
+        }
+    }
+    if (main.kind === 'none' && !relaxed) {
+        for (const slot of mainSlots) {
+            const em = smLower(slot.teacher_email);
+            if (!em) continue;
+            const ct = timeHHMM(slot.time_local);
+            const st = await statusOf(em, ct, true);
+            if (smAvailable(st)) {
+                const t = await smV5Teacher(ctx, em, nameOf(em), 'ttkb', st);
+                if (t.joinable) { main.kind = 'own'; main.t = t; main.time = ct; main.notYet = !st.workingNow; break; }
+                if (!main.why) { main.why = `GV TTKB của bạn, ${t.name}, đang làm việc nhưng chưa có phòng meeting`; main.t = t; }
+            } else if (!main.why) {
+                main.why = `GV TTKB của bạn, ${nameOf(em)}, ${smV5Why(st, ct, true)}`;
+                main.t = { email: em, name: nameOf(em), st, kind: 'ttkb', rooms: [], mainUrl: '', joinable: false };
+            }
+        }
+    }
+    if (main.kind === 'none' && relaxed) {
+        // no class today: name a TTKB teacher of hers only if one is live right now
+        const all = [...new Set((data || []).filter(r => r.buoi_phu !== true).map(r => smLower(r.teacher_email)).filter(Boolean))];
+        for (const em of all) {
+            const st = await statusOf(em, smNowHHMM(), false);
+            if (st.workingNow && !st.off) {
+                const t = await smV5Teacher(ctx, em, nameOf(em), 'ttkb', st);
+                if (t.joinable) { main.kind = 'own'; main.t = t; main.time = ''; break; }
+            }
+        }
+    }
+    const mainOk = main.kind !== 'none' && !!(main.t && main.t.joinable);
+    const classOver = !relaxed && !!classTime && !mainOk
+        && ((nowMin - toMinutes(classTime)) >= 120 || !!(main.t && main.t.st && main.t.st.ended && !main.t.st.off));
+
+    // ---- Phòng Breakout
+    const br = { kind: 'none', t: null, why: '', insteadName: '', insteadWhy: '', notYet: false, others: [],
+                 time: (!relaxed && auxSlots.length) ? timeHHMM(auxSlots[0].time_local) : '' };
+    const brTime = br.time || classTime || smNowHHMM();
+    let ownSoon = null;
+    if (pinnedB.length) {
+        br.kind = 'pinned';
+        br.t = await smV5Teacher(ctx, pinnedB[0], nameOf(pinnedB[0]), 'breakout', LIVE);
+    } else {
+        if (brSub) {
+            const se = smLower(brSub.substitute_teacher_email);
+            const st = await statusOf(se, brTime, false);
+            if (!st.off && (st.workingNow || st.upcoming.length)) {
+                const t = await smV5Teacher(ctx, se, brSub.substitute_teacher_name || nameOf(se), 'breakout', st);
+                if (t.joinable) {
+                    if (st.workingNow) { br.kind = 'sub'; br.t = t; }
+                    else if (!ownSoon) ownSoon = { t, kind: 'sub' };
+                }
+            }
+        }
+        if (br.kind === 'none') {
+            const cands = relaxed
+                ? [...new Set([...ownBreakout, ...(data || []).map(r => smLower(r.breakout_email)).filter(Boolean)])]
+                : ownBreakout;
+            for (const em of cands) {
+                const st = await statusOf(em, brTime, false);
+                if (st.off || !(st.workingNow || st.upcoming.length)) {
+                    if (!br.insteadName && !relaxed) { br.insteadName = nameOf(em); br.insteadWhy = smV5Why(st, brTime, false); }
+                    continue;
+                }
+                const t = await smV5Teacher(ctx, em, nameOf(em), 'breakout', st);
+                if (!t.joinable) {
+                    if (!br.insteadName && !relaxed) { br.insteadName = t.name; br.insteadWhy = 'chưa có phòng meeting'; }
+                    continue;
+                }
+                if (st.workingNow) { br.kind = 'own'; br.t = t; break; }
+                if (!ownSoon) ownSoon = { t, kind: 'own' };
+            }
+        }
+        if (br.kind === 'none') {
+            const skip = new Set([...ownBreakout, ...ownTtkb, ...pinnedT, ...pinnedB]);
+            if (brSub) skip.add(smLower(brSub.substitute_teacher_email));
+            if (ttkbSub) skip.add(smLower(ttkbSub.substitute_teacher_email));
+            const picked = await smV4OnDutyPick(ctx, skip);
+            if (picked.length) {
+                const p = picked[0];
+                br.kind = 'onduty';
+                br.t = await smV5Teacher(ctx, p.em, p.name, 'breakout', LIVE, p.mainRoom || '');
+                br.t.shift = p.shift || null;
+                br.others = picked.slice(1);
+                if (ownSoon) { br.insteadName = ownSoon.t.name; br.insteadWhy = smV5Why(ownSoon.t.st, brTime, false); }
+                smV4OnDutyEmails = picked.map(x => x.em);
+            } else if (ownSoon) {
+                br.kind = ownSoon.kind; br.t = ownSoon.t; br.notYet = true;
+                br.insteadName = ''; br.insteadWhy = '';
+            }
+        }
+    }
+    if (br.kind === 'none' && br.insteadName) br.why = `GV Breakout của bạn, ${br.insteadName}, ${br.insteadWhy}`;
+
+    // ---- help: Supporter / Mix on shift right now (same source as "GV hỗ trợ đang làm việc")
+    const help = [];
+    const seen = new Set();
+    const probeTimes = items.length ? items.map(r => r.time_local) : [smNowHHMM()];
+    for (const tl of probeTimes) {
+        const ms = await getOtherMeetingsAt(client, Number(dbDay), tl, { effectiveDOW: todayDOW, overrideClassDateToToday: relaxed, currentStudentEmail: studentEmail });
+        for (const m of ms) {
+            const em = smLower(m.teacher_email);
+            const dl = String(m.department || '').trim().toLowerCase();
+            if (!em || seen.has(em) || dl === 'bm' || dl.includes('breakout')) continue;
+            seen.add(em);
+            const mt = await fetchTiepHvMeeting(em);
+            help.push({
+                em, name: String(m.teacher_name || em).trim(),
+                label: (dl === 'supporter' || dl.includes('support')) ? 'Supporter' : (dl === 'mix' ? 'Mix' : (String(m.department || '').trim() || 'GV')),
+                url: (mt && mt.room_name) ? smV5Url(mt.room_name, studentEmail) : ''
+            });
+            if (help.length >= 2) break;
+        }
+        if (help.length >= 2) break;
+    }
+
+    return { relaxed, classTime, classOver, main, mainOk, br, brOk: br.kind !== 'none' && !!(br.t && br.t.joinable), help, next: smV5NextClass(ctx) };
+}
+
+// The one guide sentence. Returns [kind, html].
+function smV5Headline(R) {
+    const mName = R.main.t ? wmEscape(R.main.t.name) : '';
+    const bName = R.br.t ? wmEscape(R.br.t.name) : '';
+    const brAt = R.brOk && R.br.notYet ? wmEscape(R.br.t.st.upcoming[0] ? R.br.t.st.upcoming[0].start : '') : '';
+    const brPart = !R.brOk ? ''
+        : R.br.notYet ? ` GV Breakout <b>${bName}</b> bắt đầu lúc <b>${brAt}</b>.`
+        : ` GV Breakout <b>${bName}</b> điểm danh và theo dõi bạn ở ô bên cạnh.`;
+    if (R.main.kind === 'pinned') return ['assigned', `Hôm nay bạn được <b>xếp vào meeting TTKB</b> của GV <b>${mName}</b> — vào để tương tác.${brPart}`];
+    if (R.relaxed) {
+        if (R.mainOk || R.brOk) return ['info', `Hôm nay bạn <b>không có lịch học</b>. Muốn học thêm? Vào meeting Breakout với GV đang trực.`];
+        return ['info', `Hôm nay bạn <b>không có lịch học</b>. Lúc này không có GV nào trực.`];
+    }
+    if (R.main.kind === 'sub' && R.mainOk) return ['sub', `Hôm nay GV <b>${mName}</b> dạy thay — vào meeting TTKB${R.main.notYet ? ' đúng giờ' : ''} để tương tác.${brPart}`];
+    if (R.mainOk && R.main.notYet) {
+        const at = R.main.t.st.upcoming[0] ? R.main.t.st.upcoming[0].start : R.main.time;
+        return ['soon', `GV TTKB của bạn bắt đầu lúc <b>${wmEscape(at)}</b>.${R.brOk && !R.br.notYet ? ' Muốn học ngay bây giờ? Vào meeting Breakout để GV điểm danh.' : brPart}`];
+    }
+    if (R.mainOk) return ['ok', `GV TTKB của bạn <b>đang dạy</b> — vào meeting TTKB để tương tác.${brPart}`];
+    const why = R.main.why ? wmEscape(R.main.why) + '.' : 'Hôm nay chưa có GV TTKB cho bạn.';
+    if (R.brOk) return ['fallback', `${why} Hôm nay GV Breakout <b>${bName}</b> điểm danh và theo dõi bạn — vào ô <b>Meeting Breakout</b>${R.br.notYet ? ' lúc <b>' + brAt + '</b>' : ''}.`];
+    if (R.classOver) return ['off', `Buổi học lúc <b>${wmEscape(R.classTime)}</b> hôm nay đã qua giờ. Cần hỗ trợ hoặc muốn học bù? Gọi cho chúng tôi.`];
+    return ['call', `${why} Lúc này <b>chưa có GV nào</b> cho bạn — bấm <b>Gọi hỗ trợ</b>.`];
+}
+
+function smV5Avatar(t) {
+    return `<div class="v5-tile__avatar">${wmEscape(smInitials(t.name, t.email))}</div>`;
+}
+
+function smV5MainTile(R) {
+    const o = R.main;
+    const time = o.time ? `Buổi học ${wmEscape(o.time)} · ` : '';
+    const label = `<div class="v5-tile__label"><i class="fa-solid fa-chalkboard-user"></i> Meeting TTKB <span class="v5-tile__label-sub">· tương tác với GV</span></div>`;
+    if (!R.mainOk) {
+        const who = o.t
+            ? `<div class="v5-tile__who">${smV5Avatar(o.t)}<div class="v5-tile__txt"><div class="v5-tile__name">${wmEscape(o.t.name)}</div><div class="v5-tile__sub">${time}${wmEscape(o.why || 'hiện không làm việc')}</div></div></div>`
+            : `<div class="v5-tile__sub">${R.relaxed ? 'Hôm nay bạn không có meeting TTKB.' : wmEscape(o.why || 'Hôm nay chưa có GV TTKB cho bạn.')}</div>`;
+        const note = R.brOk ? `<div class="v5-tile__note"><i class="fa-solid fa-arrow-right"></i> Hôm nay bạn học ở ô <b>Meeting Breakout</b>.</div>` : '';
+        return `<div class="v5-tile v5-tile--main v5-tile--muted">${label}${who}${note}</div>`;
+    }
+    const sub = o.kind === 'pinned' ? 'Hôm nay bạn được xếp vào meeting này'
+        : o.kind === 'sub' ? time + 'GV dạy thay hôm nay' + (o.notYet ? ' · bắt đầu lúc ' + wmEscape(o.t.st.upcoming[0] ? o.t.st.upcoming[0].start : '') : '')
+        : o.notYet ? time + 'GV TTKB của bạn · bắt đầu lúc ' + wmEscape(o.t.st.upcoming[0] ? o.t.st.upcoming[0].start : '')
+        : time + 'GV TTKB của bạn · đang dạy';
+    const btn = `<div class="v5-row"><a class="v5-btn v5-btn--main${o.notYet ? ' v5-btn--soon' : ''}" href="${wmEscape(o.t.mainUrl)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-video"></i> Vào meeting TTKB${o.notYet ? ' (chưa tới giờ)' : ''}</a></div>`;
+    return `<div class="v5-tile v5-tile--main">${label}<div class="v5-tile__who">${smV5Avatar(o.t)}<div class="v5-tile__txt"><div class="v5-tile__name">${wmEscape(o.t.name)}</div><div class="v5-tile__sub">${sub}</div></div></div>${btn}</div>`;
+}
+
+function smV5BreakoutTile(R) {
+    const o = R.br;
+    const time = o.time ? `Buổi phụ ${wmEscape(o.time)} · ` : '';
+    const label = `<div class="v5-tile__label"><i class="fa-solid fa-door-open"></i> Meeting Breakout <span class="v5-tile__label-sub">· GV điểm danh và theo dõi bạn</span></div>`;
+    if (!R.brOk) {
+        const who = o.why
+            ? `<div class="v5-tile__sub">${wmEscape(o.why)}.</div>`
+            : '';
+        const line = R.relaxed ? 'Lúc này không có GV Breakout trực.' : 'Chưa có GV Breakout nào lúc này.';
+        return `<div class="v5-tile v5-tile--breakout v5-tile--muted">${label}${who}<div class="v5-tile__sub">${line} Cần gấp? <a href="${wmEscape(SM_V3.SUPPORT_URL)}" target="_blank" rel="noopener noreferrer">Gọi hỗ trợ</a>.</div></div>`;
+    }
+    const t = o.t;
+    let sub;
+    if (o.kind === 'onduty') {
+        sub = `Đang trực${t.shift ? ' đến ' + wmEscape(t.shift.end) : ''}`;
+        if (o.insteadName) sub += ` · thay cho <b>${wmEscape(o.insteadName)}</b> (${wmEscape(o.insteadWhy)})`;
+    } else if (o.kind === 'pinned') {
+        sub = 'Hôm nay bạn được xếp vào với GV này';
+    } else if (o.kind === 'sub') {
+        sub = 'GV Breakout dạy thay hôm nay' + (o.notYet ? ' · bắt đầu lúc ' + wmEscape(t.st.upcoming[0] ? t.st.upcoming[0].start : '') : '');
+    } else if (R.main.t && R.mainOk && R.main.t.email === t.email) {
+        sub = time + 'Cũng là GV TTKB của bạn · phòng Breakout trong meeting này';
+    } else {
+        sub = time + (o.notYet ? 'GV Breakout của bạn · bắt đầu lúc ' + wmEscape(t.st.upcoming[0] ? t.st.upcoming[0].start : '') : 'GV Breakout của bạn · đang trực');
+    }
+    const step1 = t.mainUrl
+        ? `<div class="v5-step"><span class="v5-step__n">1</span><div class="v5-row"><a class="v5-btn v5-btn--breakout${o.notYet ? ' v5-btn--soon' : ''}" href="${wmEscape(t.mainUrl)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-headset"></i> Vào meeting của GV Breakout</a><span class="v5-row__hint">GV điểm danh bạn ở đây</span></div></div>`
+        : '';
+    const chips = t.rooms.map(r => `<a class="tmc-room-btn" href="${wmEscape(r.url)}" target="_blank" rel="noopener noreferrer" title="${wmEscape(r.room_name)}">${wmEscape(r.num)}</a>`).join('');
+    const step2 = t.rooms.length
+        ? `<div class="v5-step"><span class="v5-step__n">2</span><div class="v5-step__txt">Rồi vào một phòng Breakout trống (${t.rooms.length}):<div class="v5-rooms">${chips}</div></div></div>`
+        : (o.notYet
+            ? `<div class="v5-step"><span class="v5-step__n">2</span><div class="v5-step__txt">Phòng Breakout sẽ mở khi GV bắt đầu lúc <b>${wmEscape(t.st.upcoming[0] ? t.st.upcoming[0].start : '')}</b>.</div></div>`
+            : `<div class="v5-step"><span class="v5-step__n">2</span><div class="v5-step__txt">Phòng Breakout đang kín — ở lại meeting của GV, GV sẽ mời bạn vào phòng.</div></div>`);
+    const note = o.notYet ? `<div class="v5-tile__note"><i class="fa-regular fa-clock"></i> Chưa tới giờ — vào đúng giờ GV bắt đầu.</div>` : '';
+    const others = (o.others || []).length
+        ? `<div class="v5-tile__note"><i class="fa-solid fa-people-arrows"></i> Cũng đang trực: ${o.others.map(x => wmEscape(x.name)).join(', ')}.</div>`
+        : '';
+    return `<div class="v5-tile v5-tile--breakout">${label}<div class="v5-tile__who">${smV5Avatar(t)}<div class="v5-tile__txt"><div class="v5-tile__name">${wmEscape(t.name)}</div><div class="v5-tile__sub">${sub}</div></div></div><div class="v5-steps">${step1}${step2}</div>${note}${others}</div>`;
+}
+
+// Today's card in the two-tile look. Returns null on any error, so the routing
+// line in smAgTodayBody falls through to the sm-v3 sections.
+async function smV5TodayBody(ctx, items, dbDay, noClass) {
+    try {
+        const R = await smV5Resolve(ctx, items, dbDay, noClass);
+        const [kind, text] = smV5Headline(R);
+        const tiles = `<div class="v5-tiles">${smV5MainTile(R)}${smV5BreakoutTile(R)}</div>`;
+        const h = R.help[0];
+        const helpLeft = h
+            ? `<span><i class="fa-solid fa-headset"></i> Cần giúp? ${wmEscape(h.label)} <b>${wmEscape(h.name)}</b> đang trực</span>${h.url ? `<a class="v5-help__btn" href="${wmEscape(h.url)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-comments"></i> Vào gặp ${wmEscape(h.label)}</a>` : ''}`
+            : `<span><i class="fa-solid fa-headset"></i> Cần giúp? Gọi cho chúng tôi.</span>`;
+        const helpBar = `<div class="v5-help"><span class="v5-help__left">${helpLeft}</span><a class="v5-help__call" href="${wmEscape(SM_V3.SUPPORT_URL)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-phone-volume"></i> Gọi hỗ trợ</a></div>`;
+        const badge = (!R.mainOk && !R.brOk)
+            ? smCallBadgeHTML(R.relaxed ? 'Cần hỗ trợ hoặc muốn học bù? Hãy gọi cho chúng tôi.' : (R.classOver ? 'Buổi học hôm nay đã qua giờ. Cần hỗ trợ hoặc muốn học bù? Hãy gọi cho chúng tôi.' : `Chưa có giáo viên nào cho buổi học <b>${wmEscape(R.classTime)}</b> của bạn.`), R.relaxed || R.classOver)
+            : '';
+        const next = R.next ? `<div class="v5-next"><i class="fa-regular fa-calendar"></i> Buổi học tiếp theo: <b>${R.next}</b></div>` : '';
+        return `<div class="ag__card ag__card--${kind}">${smStripHTML(kind, text)}<div class="ag__cardbody">${tiles}${badge}${helpBar}${next}</div></div>`;
+    } catch (e) {
+        console.error('[sm-v5] today render error, falling back to the sections', e);
+        return null;
+    }
+}
+// === tansinh sm-v4 END ===
