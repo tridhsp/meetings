@@ -451,7 +451,7 @@ async function initRoleBasedFab(session) {
 
     // Only Admin / Super Admin get the + FABs
     if (allowed) {
-      setupFabModal();          // existing + button (left)
+      // tansinh watch-link v3: setupFabModal() is no longer called; the "Thêm meeting link" popup was removed on 10 Oct 2026.
       setupWorkingFabModal();   // working-meeting button (right)
       document.body.classList.add('has-add-fab'); // Add class so CSS can position confirm FAB higher
     } else {
@@ -497,276 +497,133 @@ function showLogin() {
 
 
 /* ---------- FAB + Modal ---------- */
-function setupFabModal() {
-  // Create FAB if missing
-  let fab = document.getElementById('fabAdd');
-  if (!fab) {
-    fab = document.createElement('button');
-    fab.id = 'fabAdd';
-    fab.className = 'fab';
-    fab.title = 'Add';
-    fab.setAttribute('aria-label', 'Add');
-    fab.innerHTML = '<i class="fa-solid fa-plus" aria-hidden="true"></i>';
-    document.body.appendChild(fab);
-  }
-
-  // Create modal if missing
-  let modal = document.getElementById('fabModal');
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'fabModal';
-    modal.className = 'modal';
-    modal.setAttribute('aria-hidden', 'true');
-    modal.innerHTML = `
-      <div class="modal-overlay" id="fabOverlay"></div>
-
-      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-  <!-- Saving overlay (hidden by default) -->
-  <div id="savingOverlay" class="saving-overlay" hidden>
-    <div class="saving-box">
-      <div class="spinner"></div>
-      <div class="saving-label">Đang lưu…</div>
-    </div>
-  </div>
-
-        <div class="modal-header">
-          <h3 id="modalTitle">Quick Action</h3>
-          <button class="icon-btn" id="modalClose" aria-label="Close">
-            <i class="fa-solid fa-xmark"></i>
-          </button>
-        </div>
-
-        <div class="modal-body">
-          <div class="form-group">
-            <label for="teacherEmail">Teacher Email</label>
-            <input type="text" id="teacherEmail" class="input" placeholder="Type at least 4 characters..." autocomplete="off" />
-            <div id="emailSuggestions" class="suggestions" role="listbox" aria-label="Email suggestions"></div>
-            <p class="hint">Start typing an email (≥ 4 chars). Suggestions appear after 1s.</p>
-          </div>
-
-          <div class="form-group">
-            <label for="teacherName">Teacher Name</label>
-            <input type="text" id="teacherName" class="input" placeholder="Auto-filled" readonly />
-          </div>
-
-          <div class="form-group">
-            <label for="meetingHv">Meeting tiếp HV</label>
-            <input type="text" id="meetingHv" class="input" placeholder="Nhập nội dung..." />
-            <div class="form-subgroup">
-              <label for="meetingHvLink" class="sub-label">Link gốc</label>
-              <input type="url" id="meetingHvLink" class="input" placeholder="Dán link gốc…" inputmode="url" />
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label for="meetingWork">Meeting Work</label>
-            <input type="text" id="meetingWork" class="input" placeholder="Nhập nội dung..." />
-            <div class="form-subgroup">
-              <label for="meetingWorkLink" class="sub-label">Link gốc</label>
-              <input type="url" id="meetingWorkLink" class="input" placeholder="Dán link gốc…" inputmode="url" />
-            </div>
-          </div>
-        </div>
-
-        <div class="modal-footer">
-          <button class="btn-ghost" id="modalCancel">Close</button>
-          <button class="btn-primary" id="modalSave">
-            <i class="fa-solid fa-floppy-disk"></i> Save
-          </button>
-        </div>
-      </div>`;
-
-    document.body.appendChild(modal);
-  }
-
-
-  if (modal.dataset.wired === 'true') return; // prevent double wiring
-
-  const overlay = modal.querySelector('#fabOverlay');
-  const closeBtn = modal.querySelector('#modalClose');
-  const cancelBtn = modal.querySelector('#modalCancel');
-  const saveBtn = modal.querySelector('#modalSave');
-
-  // --- Email suggestions + auto-fill name ---
-  const emailInput = modal.querySelector('#teacherEmail');
-  const nameInput = modal.querySelector('#teacherName');
-  const sugBox = modal.querySelector('#emailSuggestions');
-  let debounceId;
-
-  function renderSuggestions(list) {
-    if (!Array.isArray(list) || list.length === 0) {
-      sugBox.innerHTML = '';
-      sugBox.style.display = 'none';
-      return;
-    }
-    sugBox.innerHTML = list
-      .map(email => `<div class="suggestion-item" role="option" data-email="${email}">
-        <i class="fa-solid fa-user"></i> ${email}
-      </div>`)
-      .join('');
-    sugBox.style.display = 'block';
-  }
-
-  // Debounced suggestions (1s) only when ≥4 chars
-  emailInput.addEventListener('input', () => {
-    const q = emailInput.value.trim();
-    clearTimeout(debounceId);
-
-    if (q.length < 4) {
-      renderSuggestions([]);
-      return;
-    }
-
-    debounceId = setTimeout(async () => {
-      try {
-        const { data: { session } } = await client.auth.getSession();
-        const token = session?.access_token;
-        if (!token) return;
-
-        const res = await fetch(`${_DO}/teachers-search?q=${encodeURIComponent(q)}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-
-        if (!res.ok) return renderSuggestions([]);
-        const { suggestions } = await res.json();
-        renderSuggestions(suggestions || []);
-      } catch {
-        renderSuggestions([]);
-      }
-    }, 1000);
-  });
-
-  // Pick a suggestion → fill email → fetch name
-  sugBox.addEventListener('click', async (e) => {
-    const item = e.target.closest('.suggestion-item');
-    if (!item) return;
-
-    const email = item.dataset.email;
-    emailInput.value = email;
-    renderSuggestions([]);
-
-    try {
-      const { data: { session } } = await client.auth.getSession();
-      const token = session?.access_token;
-      if (!token) return;
-
-      const r = await fetch(`${_DO}/teacher-by-email?email=${encodeURIComponent(email)}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!r.ok) return;
-      const { full_name } = await r.json();
-      nameInput.value = full_name || '';
-    } catch { /* ignore */ }
-  });
-
-  // If user types full email and leaves the field, try to fetch name
-  emailInput.addEventListener('blur', async () => {
-    const email = emailInput.value.trim();
-    if (!email || !email.includes('@')) return;
-    try {
-      const { data: { session } } = await client.auth.getSession();
-      const token = session?.access_token;
-      if (!token) return;
-      const r = await fetch(`${_DO}/teacher-by-email?email=${encodeURIComponent(email)}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!r.ok) return;
-      const { full_name } = await r.json();
-      nameInput.value = full_name || '';
-    } catch { /* ignore */ }
-  });
-
-  // Close suggestions when clicking outside the content area
-  modal.addEventListener('click', (ev) => {
-    const inside = ev.target.closest('.modal-content');
-    if (!inside) renderSuggestions([]);
-  });
-
-  const open = () => { modal.classList.add('show'); modal.setAttribute('aria-hidden', 'false'); };
-  const close = () => { modal.classList.remove('show'); modal.setAttribute('aria-hidden', 'true'); };
-
-  fab.addEventListener('click', async () => {
-    const verified = await askSecurityKey('add a meeting');
-    if (!verified) return;
-    open();
-    emailInput?.focus();
-  });
-
-  overlay.addEventListener('click', close);
-  closeBtn.addEventListener('click', close);
-  cancelBtn.addEventListener('click', close);
-
-  // ESC to close
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
-
-  // Placeholder save handler
-  saveBtn.addEventListener('click', async () => {
-    const savingOverlay = document.getElementById('savingOverlay');
-
-    // Disable button + show overlay immediately
-    saveBtn.disabled = true;
-    savingOverlay?.removeAttribute('hidden');
-
-    try {
-      const data = {
-        teacherEmail: modal.querySelector('#teacherEmail')?.value?.trim() || '',
-        teacherName: modal.querySelector('#teacherName')?.value?.trim() || '',
-        meetingHv: modal.querySelector('#meetingHv')?.value?.trim() || '',
-        meetingHvLink: modal.querySelector('#meetingHvLink')?.value?.trim() || '',
-        meetingWork: modal.querySelector('#meetingWork')?.value?.trim() || '',
-        meetingWorkLink: modal.querySelector('#meetingWorkLink')?.value?.trim() || '',
-      };
-
-      // Get the logged-in user's token to prove who is saving
-      const { data: sessionData } = await client.auth.getSession();
-      const token = sessionData?.session?.access_token;
-      if (!token) throw new Error('No session. Please log in again.');
-
-      // Call your Netlify function to insert into DB
-      const res = await fetch(_DO + '/addmeeting', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(data)
-      });
-
-      const out = await res.json().catch(() => ({}));
-      if (!res.ok || !out?.ok) {
-        throw new Error(out?.error || res.statusText || 'Save failed');
-      }
-
-      // Success UI
-      close();
-      const msg = document.getElementById('message');
-      if (msg) {
-        msg.textContent = 'Saved!';
-        msg.className = 'success';
-        setTimeout(() => { msg.textContent = ''; msg.className = ''; }, 1400);
-
-        loadWorkMeetings(); // refresh list on the main page
-
-      }
-    } catch (err) {
-      const msg = document.getElementById('message');
-      if (msg) {
-        msg.textContent = String(err?.message || err);
-        msg.className = 'error';
-      }
-    } finally {
-      // Always hide overlay + re-enable button
-      savingOverlay?.setAttribute('hidden', '');
-      saveBtn.disabled = false;
-    }
-  });
-
-
-
-}
+/* === tansinh watch-link v3: the "Thêm meeting link" popup lived here until 10 Oct 2026.
+   Meeting links now come from watch.tansinh.info inside "Thêm ca làm việc" (below), so the
+   popup, its FAB and the meeting_links directory are no longer used by this page.
+   patch-meetings-watchlink.py undo puts the original block back byte for byte. === */
 
 /* ---------- Working Meeting FAB + Popup ---------- */
-/* ---------- Working Meeting FAB + Popup (enhanced) ---------- */
+/* === tansinh watch-link v3 BEGIN (10 Oct 2026) ===
+   "Thêm ca làm việc" rebuilt. The teacher is searched by name or email in
+   watch.tansinh.info's list (/watch-teachers-list), and the meeting link is the
+   teacher's Tiếp HV room from /watch-meetings-list: https://meeting.tansinh.info/<room_name>.
+   Breakout rooms are ignored on purpose. The meeting_links directory and the
+   "Thêm meeting link" popup are no longer used. The Work_meeting field is gone:
+   /addworkmeeting and /editcalendar keep every payload key, workMeeting is sent
+   empty for a new shift and unchanged for an edited one.
+   The time fields are typed 24-hour fields with hour/minute chips for the start and
+   duration chips for the end, replacing the browser's own picker.
+   Undo: python3 patch-meetings-watchlink.py undo <folder>  (restores byte for byte). */
+const WL_MEET_BASE = 'https://meeting.tansinh.info/';
+const WL_WATCH_CREATE_URL = 'https://watch.tansinh.info/meetings.html';
+
+function wlEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+}
+function wlUsername(email) {
+  return String(email || '').split('@')[0].trim().toLowerCase();
+}
+function wlInitials(name, email) {
+  const src = String(name || email || '').trim();
+  if (!src) return 'GV';
+  const parts = src.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[parts.length - 2].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+}
+function wlFmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+// Group watch rooms by teacher email: the one Tiếp HV room, and how many breakouts.
+function wlIndexRooms(rows) {
+  const by = new Map();
+  (Array.isArray(rows) ? rows : []).forEach(r => {
+    const em = String(r && r.teacher_email || '').trim().toLowerCase();
+    if (!em) return;
+    const e = by.get(em) || { tiep: null, breakouts: 0 };
+    const room = String(r.room_name || '');
+    const isTiep = r.meeting_type === 'tiep-hv' || (!r.meeting_type && room === wlUsername(em));
+    if (isTiep) {
+      if (!e.tiep || (room === wlUsername(em) && e.tiep.room_name !== wlUsername(em))) e.tiep = r;
+    } else {
+      e.breakouts += 1;
+    }
+    by.set(em, e);
+  });
+  return by;
+}
+function wlInjectStyles() {
+  if (document.getElementById('tsWatchLinkStyles')) return;
+  const st = document.createElement('style');
+  st.id = 'tsWatchLinkStyles';
+  st.textContent = `
+.wl-modal [hidden]{display:none !important}
+.wl-modal .modal-header{align-items:flex-start}
+.wl-sub{margin:4px 0 0;font-size:12px;color:#6b7280;line-height:1.4}
+.wl-searchwrap{position:relative}
+.wl-searchwrap>i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#9ca3af;pointer-events:none;font-size:13px}
+.wl-searchwrap .input{padding-left:34px}
+.wl-sug .suggestion-item{justify-content:space-between;gap:12px}
+.wl-sug .suggestion-item.active{background:#eef2ff}
+.wl-sug-main{display:flex;flex-direction:column;min-width:0}
+.wl-sug-name{font-weight:600;color:#111827}
+.wl-sug-email{font-size:12px;color:#6b7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wl-pill{flex:none;font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;background:#f3f4f6;color:#6b7280}
+.wl-pill.ok{background:#dcfce7;color:#166534}
+.wl-teacher{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid #e5e7eb;border-radius:12px;margin-bottom:12px;background:#fff}
+.wl-avatar{width:40px;height:40px;border-radius:50%;background:#e0ecff;color:#1d4ed8;font-weight:700;display:grid;place-items:center;flex:none}
+.wl-who{min-width:0;flex:1}
+.wl-name{font-weight:700;color:#111827}
+.wl-email{font-size:12px;color:#6b7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wl-change{border:none;background:transparent;color:var(--primary);font-weight:600;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;white-space:nowrap;font-family:inherit}
+.wl-change:hover{background:#f3f4f6}
+.wl-room{padding:12px 14px;border-radius:12px;background:#f8fafc;border:1px solid #e5e7eb;margin-bottom:14px}
+.wl-room-head{font-size:12px;color:#6b7280;margin-bottom:8px}
+.wl-status{display:flex;align-items:flex-start;gap:8px;font-size:14px;color:#111827;line-height:1.4}
+.wl-dot{width:10px;height:10px;border-radius:50%;background:#9ca3af;margin-top:5px;flex:none}
+.wl-status[data-state="ok"] .wl-dot{background:#16a34a}
+.wl-status[data-state="missing"] .wl-dot{background:#f59e0b}
+.wl-status[data-state="error"] .wl-dot{background:#dc2626}
+.wl-status[data-state="loading"] .wl-dot{animation:wl-pulse 1s ease-in-out infinite}
+@keyframes wl-pulse{50%{opacity:.3}}
+@media (prefers-reduced-motion:reduce){.wl-status[data-state="loading"] .wl-dot{animation:none}}
+.wl-status small{display:block;color:#6b7280;font-size:12px;margin-top:2px}
+.wl-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 2px}
+.wl-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;color:#374151;font-weight:600;font-size:13px;cursor:pointer;text-decoration:none;font-family:inherit}
+.wl-btn:hover{background:#f9fafb;border-color:#d1d5db}
+.wl-btn:focus-visible,.wl-change:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.wl-linklabel{display:block;font-size:12px;color:#6b7280;margin:12px 0 6px}
+.wl-linkrow{display:flex;align-items:center;gap:6px}
+.wl-linkrow .input{flex:1;min-width:0;font-size:13px;background:#fff}
+.wl-linkrow .input[readonly]{color:#374151}
+.wl-linkrow .icon-btn{display:inline-flex;flex:none;color:#6b7280}
+.wl-manual{display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;margin-top:10px;cursor:pointer;user-select:none}
+.wl-manual input{width:16px;height:16px;accent-color:var(--primary)}
+.wl-note{margin-top:10px}
+.wl-note strong{color:#374151;word-break:break-all}
+.wl-note button{margin-left:6px}
+.wl-time-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px}
+.wl-time-head label{margin:0}
+.wl-time-sum{font-size:12px;color:#6b7280;font-variant-numeric:tabular-nums;text-align:right}
+.wl-time-sum.bad{color:#b91c1c;font-weight:600}
+.wl-time-fields{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.wl-tinput{width:92px;flex:none;text-align:center;font-variant-numeric:tabular-nums;font-size:15px;font-weight:600;padding:8px 10px;font-family:inherit}
+.wl-tinput.bad{border-color:#dc2626}
+.wl-time-arrow{color:#9ca3af}
+.wl-chips{display:flex;flex-wrap:wrap;gap:4px}
+.wl-chip{font-family:inherit;font-size:13px;font-variant-numeric:tabular-nums;line-height:1;padding:7px 0;min-width:40px;text-align:center;border:1px solid #e5e7eb;background:#fff;color:#374151;border-radius:8px;cursor:pointer}
+.wl-chip:hover{border-color:#cbd5e1;background:#f9fafb}
+.wl-chip.on{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
+.wl-chip:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.wl-chiprow{display:flex;align-items:flex-start;gap:8px;margin-top:6px}
+.wl-chiplabel{font-size:12px;color:#6b7280;flex:none;width:56px;padding-top:7px}
+.wl-chips--dur .wl-chip{min-width:46px}
+`;
+  document.head.appendChild(st);
+}
+
 function setupWorkingFabModal() {
   // 1) Create the right-side FAB if missing
   let fab = document.getElementById('fabAddWorking');
@@ -774,11 +631,13 @@ function setupWorkingFabModal() {
     fab = document.createElement('button');
     fab.id = 'fabAddWorking';
     fab.className = 'fab fab--right';
-    fab.title = 'Add working meeting';
-    fab.setAttribute('aria-label', 'Add working meeting');
+    fab.title = 'Thêm ca làm việc';
+    fab.setAttribute('aria-label', 'Thêm ca làm việc');
     fab.innerHTML = '<i class="fa-solid fa-briefcase" aria-hidden="true"></i>';
     document.body.appendChild(fab);
   }
+
+  wlInjectStyles();
 
   // 2) Build modal UI
   let modal = document.getElementById('workingModal');
@@ -790,7 +649,7 @@ function setupWorkingFabModal() {
     modal.innerHTML = `
       <div class="modal-overlay" id="wmOverlay"></div>
 
-      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="wmTitle">
+      <div class="modal-content wl-modal" role="dialog" aria-modal="true" aria-labelledby="wmTitle">
         <!-- Saving overlay -->
         <div id="wmSaving" class="saving-overlay" hidden>
           <div class="saving-box">
@@ -800,89 +659,130 @@ function setupWorkingFabModal() {
         </div>
 
         <div class="modal-header">
-          <h3 id="wmTitle">Add work meeting</h3>
-          <button class="icon-btn" id="wmClose" aria-label="Close">
+          <div>
+            <h3 id="wmTitle">Thêm ca làm việc</h3>
+            <p class="wl-sub">Meeting link lấy từ watch.tansinh.info. Chỉ dùng phòng Tiếp HV, không dùng phòng Breakout.</p>
+          </div>
+          <button class="icon-btn" id="wmClose" aria-label="Đóng">
             <i class="fa-solid fa-xmark"></i>
           </button>
         </div>
 
         <div class="modal-body">
-          <!-- Teacher Email (typeahead ≥4 chars, 1s debounce) -->
-          <div class="form-group">
-            <label for="wmEmail">Teacher Email</label>
-            <input type="email" id="wmEmail" class="input" placeholder="Type at least 4 characters…" autocomplete="off" />
-            <div id="wmEmailSug" class="suggestions" role="listbox" aria-label="Email suggestions"></div>
-            <p class="hint">Start typing (≥ 4 chars). Suggestions appear after 1s.</p>
+          <!-- Teacher: searched by name or email in watch.tansinh.info's list -->
+          <div class="form-group" id="wlPick">
+            <label for="wlSearch">Giáo viên</label>
+            <div class="wl-searchwrap">
+              <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+              <input type="text" id="wlSearch" class="input" placeholder="Gõ tên hoặc email để tìm" autocomplete="off" />
+            </div>
+            <div id="wlSug" class="suggestions wl-sug" role="listbox" aria-label="Danh sách giáo viên"></div>
+            <p class="hint" id="wlPickHint">Đang tải danh sách giáo viên…</p>
           </div>
 
-          <!-- Tên GV (auto-filled from meeting_links.teacher_name) -->
-          <div class="form-group">
-            <label for="wmName">Tên GV</label>
-            <input type="text" id="wmName" class="input" placeholder="Auto-filled" readonly />
+          <div class="wl-teacher" id="wlTeacher" hidden>
+            <div class="wl-avatar" id="wlAvatar" aria-hidden="true">GV</div>
+            <div class="wl-who">
+              <div class="wl-name" id="wlName"></div>
+              <div class="wl-email" id="wlEmail"></div>
+            </div>
+            <button type="button" class="wl-change" id="wlChange">Chọn GV khác</button>
           </div>
 
-          <!-- Meeting link (auto-filled from meeting_links.link_meeting) -->
-          <div class="form-group">
-            <label for="wmMeetingLink">Meeting link</label>
-            <input type="url" id="wmMeetingLink" class="input" placeholder="Auto-filled (editable)" inputmode="url" />
+          <!-- Meeting link: the teacher's Tiếp HV room on watch -->
+          <div class="wl-room" id="wlRoom" hidden>
+            <div class="wl-room-head">Phòng Tiếp HV trên watch.tansinh.info</div>
+            <div class="wl-status" id="wlStatus" data-state="loading">
+              <span class="wl-dot" aria-hidden="true"></span>
+              <span id="wlStatusText">Đang kiểm tra…</span>
+            </div>
+            <div class="wl-actions" id="wlActions" hidden>
+              <a class="wl-btn" id="wlCreateLink" href="${WL_WATCH_CREATE_URL}" target="_blank" rel="noopener">
+                <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i> Tạo phòng trên watch
+              </a>
+              <button type="button" class="wl-btn" id="wlRecheck">
+                <i class="fa-solid fa-rotate" aria-hidden="true"></i> Kiểm tra lại
+              </button>
+            </div>
+            <label for="wmMeetingLink" class="wl-linklabel">Meeting link của ca này</label>
+            <div class="wl-linkrow">
+              <input type="url" id="wmMeetingLink" class="input" inputmode="url" readonly placeholder="https://meeting.tansinh.info/…" />
+              <button type="button" class="icon-btn" id="wlCopy" title="Sao chép link" aria-label="Sao chép link">
+                <i class="fa-regular fa-copy" aria-hidden="true"></i>
+              </button>
+              <a class="icon-btn" id="wlOpen" href="#" target="_blank" rel="noopener" title="Mở link" aria-label="Mở link">
+                <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+              </a>
+            </div>
+            <label class="wl-manual"><input type="checkbox" id="wlManual" /> Tự nhập link, hoặc để trống</label>
+            <p class="hint wl-note" id="wlNote" hidden></p>
           </div>
 
-          <!-- Work_meeting (auto-filled from meeting_links.link_work_meeting) -->
+          <!-- Department -->
           <div class="form-group">
-            <label for="wmWorkMeeting">Work_meeting</label>
-<input type="url" id="wmWorkMeeting" class="input" placeholder="Auto-filled (editable)" inputmode="url" />
-</div>
+            <label for="wmDept">Bộ phận</label>
+            <select id="wmDept" class="input">
+              <option value="">— Chọn —</option>
+              <option value="TTKB">TTKB</option>
+              <option value="Breakout">Breakout</option>
+              <option value="BM">BM</option>
+              <option value="Supporter">Supporter</option>
+              <option value="Mix">Mix</option>
+            </select>
+          </div>
 
-<!-- Department -->
-<div class="form-group">
-  <label for="wmDept">Department</label>
-  <select id="wmDept" class="input">
-    <option value="">— Select —</option>
-    <option value="TTKB">TTKB</option>
-    <option value="Breakout">Breakout</option>
-    <option value="BM">BM</option>
-    <option value="Supporter">Supporter</option>
-    <option value="Mix">Mix</option>
-  </select>
-</div>
+          <!-- Working date -->
+          <div class="form-group">
+            <label for="wmDate">Ngày làm việc</label>
+            <input type="date" id="wmDate" class="input" required />
+          </div>
 
-<!-- Working date + time -->
-<div class="form-row-3">
-  <div class="form-group">
-    <label for="wmDate">Working date</label>
-    <input type="date" id="wmDate" class="input" required />
-  </div>
-  <div class="form-group">
-    <label for="wmStart">Start time</label>
-    <input type="time" id="wmStart" class="input" required />
-  </div>
-  <div class="form-group">
-    <label for="wmEnd">End time</label>
-    <input type="time" id="wmEnd" class="input" required />
-  </div>
-</div>
+          <!-- Working time: typed 24h fields + chips. No browser time picker. -->
+          <div class="form-group wl-time">
+            <div class="wl-time-head">
+              <label for="wmStart">Giờ làm việc</label>
+              <span class="wl-time-sum" id="wlTimeSum" aria-live="polite"></span>
+            </div>
+            <div class="wl-time-fields">
+              <input type="text" id="wmStart" class="input wl-tinput" inputmode="numeric" placeholder="09:00" autocomplete="off" aria-label="Giờ bắt đầu" />
+              <span class="wl-time-arrow" aria-hidden="true">→</span>
+              <input type="text" id="wmEnd" class="input wl-tinput" inputmode="numeric" placeholder="10:00" autocomplete="off" aria-label="Giờ kết thúc" />
+            </div>
+            <div class="wl-chiprow">
+              <span class="wl-chiplabel">giờ</span>
+              <div class="wl-chips" id="wlHours" aria-label="Chọn giờ bắt đầu"></div>
+            </div>
+            <div class="wl-chiprow">
+              <span class="wl-chiplabel">phút</span>
+              <div class="wl-chips" id="wlMinutes" aria-label="Chọn phút bắt đầu"></div>
+            </div>
+            <div class="wl-chiprow">
+              <span class="wl-chiplabel">kéo dài</span>
+              <div class="wl-chips wl-chips--dur" id="wlDurs" aria-label="Chọn thời lượng, giờ kết thúc tự tính"></div>
+            </div>
+            <p class="hint">Chọn giờ rồi chọn thời lượng, giờ kết thúc tự tính. Gõ 9, 930 hay 9h30 đều được; phím ↑↓ đổi 15 phút.</p>
+          </div>
 
-<!-- Repeat (weekly) -->
-<div class="form-group">
-  <label class="section-title">Repeat</label>
-  <div class="switch-row">
-    <span>Recurring (weekly)</span>
-    <label class="switch">
-      <input type="checkbox" id="wmRecurring" />
-      <span class="slider"></span>
-    </label>
-  </div>
-  <p class="hint">Turn on to repeat weekly. Off = one-time.</p>
-</div>
+          <!-- Repeat (weekly) -->
+          <div class="form-group">
+            <label class="section-title">Lặp lại</label>
+            <div class="switch-row">
+              <span>Lặp lại hàng tuần</span>
+              <label class="switch">
+                <input type="checkbox" id="wmRecurring" />
+                <span class="slider"></span>
+              </label>
+            </div>
+            <p class="hint">Bật = lặp lại mỗi tuần. Tắt = chỉ một lần.</p>
+          </div>
+        </div>
 
-
-<div class="modal-footer">
-  <button class="btn-ghost" id="wmCancel">Close</button>
-  <button class="btn-primary" id="wmSave">
-    <i class="fa-solid fa-floppy-disk"></i> Add
-  </button>
-</div>
-
+        <div class="modal-footer">
+          <button class="btn-ghost" id="wmCancel">Đóng</button>
+          <button class="btn-primary" id="wmSave" disabled>
+            <i class="fa-solid fa-plus"></i> Thêm ca
+          </button>
+        </div>
       </div>
     `;
     document.body.appendChild(modal);
@@ -890,206 +790,542 @@ function setupWorkingFabModal() {
 
   // Prevent wiring twice
   if (modal.dataset.wired === 'true') return;
+  modal.dataset.wired = 'true';
 
-  // 3) Wire up open/close
-  const open = () => {
+  const qs = (sel) => modal.querySelector(sel);
+  const pickBox    = qs('#wlPick');
+  const search     = qs('#wlSearch');
+  const sugBox     = qs('#wlSug');
+  const pickHint   = qs('#wlPickHint');
+  const teacherBox = qs('#wlTeacher');
+  const avatarEl   = qs('#wlAvatar');
+  const nameEl     = qs('#wlName');
+  const emailEl    = qs('#wlEmail');
+  const changeBtn  = qs('#wlChange');
+  const roomBox    = qs('#wlRoom');
+  const statusEl   = qs('#wlStatus');
+  const statusTxt  = qs('#wlStatusText');
+  const actionsEl  = qs('#wlActions');
+  const recheckBtn = qs('#wlRecheck');
+  const linkInput  = qs('#wmMeetingLink');
+  const copyBtn    = qs('#wlCopy');
+  const openLink   = qs('#wlOpen');
+  const manualChk  = qs('#wlManual');
+  const noteEl     = qs('#wlNote');
+  const deptSelect = qs('#wmDept');
+  const dateInput  = qs('#wmDate');
+  const startInput = qs('#wmStart');
+  const endInput   = qs('#wmEnd');
+  const recChk     = qs('#wmRecurring');
+  const saveBtn    = qs('#wmSave');
+  const savingLay  = qs('#wmSaving');
+  const titleEl    = qs('#wmTitle');
+
+  const ADD_LABEL  = '<i class="fa-solid fa-plus"></i> Thêm ca';
+  const SAVE_LABEL = '<i class="fa-solid fa-floppy-disk"></i> Lưu';
+
+  // --- the time picker: typed 24h fields, hour/minute chips for the start, duration chips for the end ---
+  const sumEl   = qs('#wlTimeSum');
+  const hoursEl = qs('#wlHours');
+  const minsEl  = qs('#wlMinutes');
+  const dursEl  = qs('#wlDurs');
+  const HOURS = Array.from({ length: 17 }, (_, i) => i + 6);   // 06 … 22
+  const MINS  = [0, 15, 30, 45];
+  const DURS  = [30, 45, 60, 75, 90, 120, 150, 180];            // minutes
+  let lastDur = 60;   // the end follows the start by this many minutes; survives between shifts
+
+  // "9" "09" "930" "0930" "9:30" "9h30" "9g30" "9.30" "9:3" -> minutes since midnight, or null
+  function tParse(raw) {
+    const s = String(raw || '').trim().toLowerCase().replace(/\s+/g, '');
+    if (!s) return null;
+    let h, mi;
+    if (/^\d+$/.test(s)) {
+      if (s.length <= 2) { h = +s; mi = 0; }
+      else if (s.length === 3) { h = +s[0]; mi = +s.slice(1); }
+      else if (s.length === 4) { h = +s.slice(0, 2); mi = +s.slice(2); }
+      else return null;
+    } else {
+      const m = s.match(/^(\d{1,2})[:hg.,](\d{0,2})$/);
+      if (!m) return null;
+      h = +m[1];
+      mi = m[2] ? +(m[2].length === 1 ? m[2] + '0' : m[2]) : 0;
+    }
+    if (h > 23 || mi > 59) return null;
+    return h * 60 + mi;
+  }
+  function tFmt(min) {
+    min = Math.max(0, Math.min(23 * 60 + 59, min));
+    return String(Math.floor(min / 60)).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0');
+  }
+  function tGet(input) { return tParse(input.value); }
+  function durText(d) {
+    const h = Math.floor(d / 60), m = d % 60;
+    return (h ? h + ' giờ' : '') + (h && m ? ' ' : '') + (m ? m + ' phút' : '');
+  }
+  function durChip(d) {
+    const h = Math.floor(d / 60), m = d % 60;
+    return h ? (h + 'g' + (m ? String(m).padStart(2, '0') : '')) : (m + 'p');
+  }
+  hoursEl.innerHTML = HOURS.map(h => '<button type="button" class="wl-chip" data-h="' + h + '">' + String(h).padStart(2, '0') + '</button>').join('');
+  minsEl.innerHTML  = MINS.map(m => '<button type="button" class="wl-chip" data-m="' + m + '">' + String(m).padStart(2, '0') + '</button>').join('');
+  dursEl.innerHTML  = DURS.map(d => '<button type="button" class="wl-chip" data-d="' + d + '">' + durChip(d) + '</button>').join('');
+
+  function paintTime(editing) {
+    const s = tGet(startInput), e = tGet(endInput);
+    hoursEl.querySelectorAll('[data-h]').forEach(b => b.classList.toggle('on', s != null && +b.dataset.h === Math.floor(s / 60)));
+    minsEl.querySelectorAll('[data-m]').forEach(b => b.classList.toggle('on', s != null && +b.dataset.m === s % 60));
+    dursEl.querySelectorAll('[data-d]').forEach(b => b.classList.toggle('on', s != null && e != null && e - s === +b.dataset.d));
+    startInput.classList.toggle('bad', editing !== startInput && startInput.value.trim() !== '' && s == null);
+    endInput.classList.toggle('bad', editing !== endInput && endInput.value.trim() !== '' && (e == null || (s != null && e <= s)));
+    if (s == null || e == null) { sumEl.textContent = 'Chọn giờ bắt đầu và kết thúc.'; sumEl.classList.remove('bad'); }
+    else if (e <= s) { sumEl.textContent = 'Giờ kết thúc phải sau giờ bắt đầu.'; sumEl.classList.add('bad'); }
+    else { sumEl.textContent = tFmt(s) + ' – ' + tFmt(e) + ' · ' + durText(e - s); sumEl.classList.remove('bad'); }
+  }
+  // Moving the start keeps the shift the same length.
+  function setStart(min) {
+    startInput.value = tFmt(min);
+    endInput.value = tFmt(min + (lastDur > 0 ? lastDur : 60));
+    paintTime();
+  }
+  function setEnd(min) {
+    endInput.value = tFmt(min);
+    const s = tGet(startInput);
+    if (s != null && min > s) lastDur = min - s;
+    paintTime();
+  }
+  // Rewrite a field in HH:MM form. Returns the minutes, or null when it cannot be read.
+  function tFormat(input) {
+    const v = tGet(input);
+    if (v != null) input.value = tFmt(v);
+    return v;
+  }
+  // Leaving a field: a typed start behaves like a chip (the end moves with it);
+  // a typed end teaches the duration the next start will keep.
+  function tCommit(input) {
+    const v = tGet(input);
+    if (v == null) return;
+    if (input === startInput) { setStart(v); return; }
+    input.value = tFmt(v);
+    const s = tGet(startInput);
+    if (s != null && v > s) lastDur = v - s;
+  }
+  hoursEl.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-h]'); if (!b) return;
+    const cur = tGet(startInput);
+    setStart(+b.dataset.h * 60 + (cur == null ? 0 : cur % 60));
+  });
+  minsEl.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-m]'); if (!b) return;
+    const cur = tGet(startInput);
+    setStart((cur == null ? 9 : Math.floor(cur / 60)) * 60 + (+b.dataset.m));
+  });
+  dursEl.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-d]'); if (!b) return;
+    lastDur = +b.dataset.d;
+    const s = tGet(startInput);
+    if (s != null) setEnd(s + lastDur); else paintTime();
+  });
+  [startInput, endInput].forEach((inp) => {
+    inp.addEventListener('input', () => paintTime(inp));
+    inp.addEventListener('blur', () => { tCommit(inp); paintTime(); });
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault(); tCommit(inp); paintTime();
+        if (inp === startInput) endInput.focus(); else inp.blur();
+        return;
+      }
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      e.preventDefault();
+      const step = (e.shiftKey ? 60 : 15) * (e.key === 'ArrowUp' ? 1 : -1);
+      const cur = tGet(inp);
+      if (cur == null) return;
+      if (inp === startInput) setStart(cur + step); else setEnd(cur + step);
+    });
+  });
+
+  // --- state ---
+  const st = {
+    teachers: null, teachersErr: '',
+    rooms: null, roomsErr: '', roomsBy: new Map(),
+    email: '', name: '',
+    roomState: 'idle', watchLink: '',
+    editId: '', editWorkMeeting: '',
+    sug: [], active: -1,
+    remoteTimer: null, loadSeq: 0,
+  };
+
+  async function wlToken() {
+    try {
+      const { data: { session } } = await client.auth.getSession();
+      return session && session.access_token || null;
+    } catch { return null; }
+  }
+  async function wlGet(path) {
+    const token = await wlToken();
+    if (!token) return { ok: false, status: 0, data: null, err: 'Chưa đăng nhập.' };
+    try {
+      const r = await fetch(_DO + path, { headers: { Authorization: 'Bearer ' + token } });
+      const data = await r.json().catch(() => null);
+      return { ok: r.ok, status: r.status, data, err: r.ok ? '' : ((data && data.error) || r.statusText || ('HTTP ' + r.status)) };
+    } catch (e) {
+      return { ok: false, status: 0, data: null, err: String((e && e.message) || e) };
+    }
+  }
+  function flash(text, cls) {
+    const msg = document.getElementById('message');
+    if (!msg) return;
+    msg.textContent = text;
+    msg.className = cls || '';
+    if (cls === 'success') setTimeout(() => { if (msg.textContent === text) { msg.textContent = ''; msg.className = ''; } }, 1800);
+  }
+
+  // --- the two watch lists: teachers and rooms ---
+  async function loadWatch(which) {
+    const seq = ++st.loadSeq;
+    const wantT = which !== 'rooms';
+    const wantR = which !== 'teachers';
+    const [tRes, rRes] = await Promise.all([
+      wantT ? wlGet('/watch-teachers-list') : Promise.resolve(null),
+      wantR ? wlGet('/watch-meetings-list') : Promise.resolve(null),
+    ]);
+    if (seq !== st.loadSeq) return; // a newer load superseded this one
+    if (tRes) {
+      if (tRes.ok && Array.isArray(tRes.data)) { st.teachers = tRes.data; st.teachersErr = ''; }
+      else { st.teachers = null; st.teachersErr = tRes.err || ('HTTP ' + tRes.status); }
+    }
+    if (rRes) {
+      if (rRes.ok && Array.isArray(rRes.data)) { st.rooms = rRes.data; st.roomsErr = ''; st.roomsBy = wlIndexRooms(st.rooms); }
+      else { st.rooms = null; st.roomsErr = rRes.err || ('HTTP ' + rRes.status); st.roomsBy = new Map(); }
+    }
+    updatePickHint();
+    if (st.email) evalRoom();
+    if (!pickBox.hidden && (search.value.trim() || document.activeElement === search)) renderSug(filterTeachers(search.value.trim()));
+  }
+  function updatePickHint() {
+    if (st.teachers) {
+      pickHint.textContent = st.teachers.length + ' giáo viên. Gõ để lọc theo tên hoặc email.';
+    } else if (st.teachersErr) {
+      pickHint.textContent = 'Không đọc được danh sách giáo viên từ watch.tansinh.info (' + st.teachersErr + '). Gõ email đầy đủ rồi nhấn Enter.';
+    } else {
+      pickHint.textContent = 'Đang tải danh sách giáo viên…';
+    }
+  }
+
+  // --- suggestions ---
+  function hasTiep(email) {
+    const e = st.roomsBy.get(String(email || '').trim().toLowerCase());
+    return !!(e && e.tiep);
+  }
+  function filterTeachers(q) {
+    if (!st.teachers) return [];
+    const query = q.toLowerCase();
+    return st.teachers
+      .filter(t => t && t.email)
+      .filter(t => !query || String(t.full_name || '').toLowerCase().includes(query) || String(t.email).toLowerCase().includes(query))
+      .sort((a, b) => String(a.full_name || a.email).localeCompare(String(b.full_name || b.email), 'vi'))
+      .slice(0, 30);
+  }
+  function renderSug(list) {
+    st.sug = Array.isArray(list) ? list : [];
+    st.active = -1;
+    if (st.sug.length === 0) {
+      sugBox.innerHTML = '';
+      sugBox.style.display = 'none';
+      return;
+    }
+    sugBox.innerHTML = st.sug.map((t) => {
+      const ok = hasTiep(t.email);
+      const pill = st.rooms
+        ? '<span class="wl-pill ' + (ok ? 'ok' : '') + '">' + (ok ? 'Có phòng' : 'Chưa có phòng') + '</span>'
+        : '';
+      return '<div class="suggestion-item" role="option" data-email="' + wlEsc(t.email) + '" data-name="' + wlEsc(t.full_name || '') + '">'
+        + '<div class="wl-sug-main"><span class="wl-sug-name">' + wlEsc(t.full_name || t.email) + '</span>'
+        + '<span class="wl-sug-email">' + wlEsc(t.email) + '</span></div>' + pill + '</div>';
+    }).join('');
+    sugBox.style.display = 'block';
+  }
+  function setActive(i) {
+    const items = sugBox.querySelectorAll('.suggestion-item');
+    if (!items.length) return;
+    st.active = Math.max(0, Math.min(items.length - 1, i));
+    items.forEach((el, k) => el.classList.toggle('active', k === st.active));
+    items[st.active].scrollIntoView({ block: 'nearest' });
+  }
+  // Fallback when watch's teacher list is not readable: the old email search.
+  function remoteSearch(q) {
+    clearTimeout(st.remoteTimer);
+    if (q.length < 3) { renderSug([]); return; }
+    st.remoteTimer = setTimeout(async () => {
+      const res = await wlGet('/teachers-search?q=' + encodeURIComponent(q));
+      const emails = (res.ok && res.data && Array.isArray(res.data.suggestions)) ? res.data.suggestions : [];
+      renderSug(emails.map(e => ({ email: e, full_name: '' })));
+    }, 600);
+  }
+
+  search.addEventListener('input', () => {
+    const q = search.value.trim();
+    if (st.teachers) renderSug(filterTeachers(q));
+    else remoteSearch(q);
+  });
+  search.addEventListener('focus', () => {
+    if (st.teachers) renderSug(filterTeachers(search.value.trim()));
+  });
+  search.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActive(st.active + 1); return; }
+    if (e.key === 'ArrowUp')   { e.preventDefault(); setActive(st.active - 1); return; }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (st.active >= 0 && st.sug[st.active]) { pickTeacher(st.sug[st.active].email, st.sug[st.active].full_name || ''); return; }
+      if (st.sug.length === 1) { pickTeacher(st.sug[0].email, st.sug[0].full_name || ''); return; }
+      const typed = search.value.trim();
+      if (typed.includes('@')) pickTeacher(typed, '');
+    }
+  });
+  sugBox.addEventListener('click', (e) => {
+    const item = e.target.closest('.suggestion-item');
+    if (!item) return;
+    pickTeacher(item.dataset.email, item.dataset.name || '');
+  });
+
+  // --- choosing a teacher ---
+  async function pickTeacher(email, name) {
+    email = String(email || '').trim().toLowerCase();
+    if (!email) return;
+    renderSug([]);
+    st.email = email;
+    st.name = name || '';
+    if (!st.name && st.teachers) {
+      const t = st.teachers.find(x => String(x.email || '').toLowerCase() === email);
+      if (t) st.name = t.full_name || '';
+    }
+    showTeacher();
+    evalRoom();
+    if (!st.name) {
+      const r = await wlGet('/teacher-by-email?email=' + encodeURIComponent(email));
+      if (r.ok && r.data && r.data.full_name && st.email === email) { st.name = r.data.full_name; showTeacher(); }
+    }
+  }
+  function showTeacher() {
+    pickBox.hidden = true;
+    teacherBox.hidden = false;
+    roomBox.hidden = false;
+    avatarEl.textContent = wlInitials(st.name, st.email);
+    nameEl.textContent = st.name || '(chưa có tên)';
+    emailEl.textContent = st.email;
+  }
+  function setStatus(state, text, small) {
+    st.roomState = state;
+    statusEl.dataset.state = state;
+    statusTxt.innerHTML = wlEsc(text) + (small ? '<small>' + wlEsc(small) + '</small>' : '');
+    actionsEl.hidden = !(state === 'missing' || state === 'error');
+  }
+  // Decide what watch says about this teacher, and fill the link in.
+  function evalRoom() {
+    if (!st.email) return;
+    const username = wlUsername(st.email);
+    if (!st.rooms && !st.roomsErr) {
+      setStatus('loading', 'Đang kiểm tra trên watch.tansinh.info…', '');
+      st.watchLink = '';
+    } else if (st.rooms) {
+      const e = st.roomsBy.get(st.email);
+      if (e && e.tiep) {
+        const when = wlFmtDate(e.tiep.created_at);
+        const extra = e.breakouts > 0 ? ('Có thêm ' + e.breakouts + ' phòng Breakout, không dùng ở đây.') : '';
+        setStatus('ok', 'Đã có phòng Tiếp HV' + (when ? ', tạo ngày ' + when : '') + '.', extra);
+        st.watchLink = WL_MEET_BASE + String(e.tiep.room_name || username);
+      } else {
+        setStatus('missing', 'Chưa có phòng Tiếp HV trên watch.tansinh.info.',
+          'Tạo phòng ở watch trước rồi bấm Kiểm tra lại. Hoặc tích "Tự nhập link, hoặc để trống" để thêm ca mà không có link từ watch.');
+        st.watchLink = '';
+      }
+    } else {
+      setStatus('error', 'Không đọc được danh sách phòng từ watch.tansinh.info (' + st.roomsErr + ').',
+        'Thử lại, hoặc tích "Tự nhập link, hoặc để trống".');
+      st.watchLink = '';
+    }
+    // A new shift takes the watch link. An edited shift keeps its own link until asked.
+    if (!manualChk.checked) {
+      if (!st.editId) linkInput.value = st.watchLink;
+      else if (!linkInput.value.trim() && st.watchLink) linkInput.value = st.watchLink;
+    }
+    syncOpenLink();
+    updateNote();
+    updateSave();
+  }
+  function syncOpenLink() {
+    const v = linkInput.value.trim();
+    if (/^https?:\/\//i.test(v)) { openLink.href = v; openLink.style.visibility = ''; }
+    else { openLink.href = '#'; openLink.style.visibility = 'hidden'; }
+  }
+  // In edit mode, say when the shift's stored link differs from the watch room.
+  function updateNote() {
+    if (!st.editId || !st.watchLink || !linkInput.value.trim() || linkInput.value.trim() === st.watchLink) {
+      noteEl.hidden = true; noteEl.innerHTML = ''; return;
+    }
+    noteEl.hidden = false;
+    noteEl.innerHTML = 'Ca này đang lưu một link khác với phòng trên watch: <strong>' + wlEsc(linkInput.value.trim()) + '</strong>.'
+      + '<button type="button" class="wl-btn" id="wlUseWatch">Dùng link từ watch</button>';
+    noteEl.querySelector('#wlUseWatch').addEventListener('click', () => {
+      linkInput.value = st.watchLink;
+      syncOpenLink(); updateNote(); updateSave();
+    });
+  }
+  function updateSave() {
+    const link = linkInput.value.trim();
+    let ok = !!st.email;
+    if (!st.editId) ok = ok && (st.roomState === 'ok' && !!link || manualChk.checked);
+    saveBtn.disabled = !ok;
+  }
+
+  // --- controls ---
+  changeBtn.addEventListener('click', () => { clearTeacher(); search.focus(); });
+  recheckBtn.addEventListener('click', async () => {
+    recheckBtn.disabled = true;
+    setStatus('loading', 'Đang kiểm tra lại…', '');
+    await loadWatch('rooms');
+    recheckBtn.disabled = false;
+  });
+  manualChk.addEventListener('change', () => {
+    linkInput.readOnly = !manualChk.checked;
+    if (manualChk.checked) linkInput.focus();
+    else { linkInput.value = st.watchLink || (st.editId ? linkInput.value : ''); syncOpenLink(); }
+    updateNote(); updateSave();
+  });
+  linkInput.addEventListener('input', () => { syncOpenLink(); updateNote(); updateSave(); });
+  copyBtn.addEventListener('click', async () => {
+    const v = linkInput.value.trim();
+    if (!v) return;
+    try {
+      await navigator.clipboard.writeText(v);
+      copyBtn.innerHTML = '<i class="fa-solid fa-check" aria-hidden="true"></i>';
+      setTimeout(() => { copyBtn.innerHTML = '<i class="fa-regular fa-copy" aria-hidden="true"></i>'; }, 1200);
+    } catch { linkInput.select(); }
+  });
+
+  function clearTeacher() {
+    st.email = ''; st.name = ''; st.roomState = 'idle'; st.watchLink = '';
+    search.value = '';
+    renderSug([]);
+    pickBox.hidden = false;
+    teacherBox.hidden = true;
+    roomBox.hidden = true;
+    manualChk.checked = false;
+    linkInput.readOnly = true;
+    linkInput.value = '';
+    noteEl.hidden = true; noteEl.innerHTML = '';
+    setStatus('loading', 'Đang kiểm tra…', '');
+    updateSave();
+  }
+  function resetForm() {
+    clearTeacher();
+    st.editId = ''; st.editWorkMeeting = '';
+    titleEl.textContent = 'Thêm ca làm việc';
+    saveBtn.innerHTML = ADD_LABEL;
+    // Prefill date/time nicely; the last start/duration are kept between shifts
+    if (!dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
+    if (tGet(startInput) == null) startInput.value = '09:00';
+    if (tGet(endInput) == null) endInput.value = tFmt(tGet(startInput) + (lastDur > 0 ? lastDur : 60));
+    paintTime();
+  }
+
+  // 3) Open / close. The sidebar button and the edit button add the "show"
+  //    class directly, so react to the class change rather than to open() only.
+  const open = () => { modal.classList.add('show'); modal.setAttribute('aria-hidden', 'false'); };
+  const close = () => { modal.classList.remove('show'); modal.setAttribute('aria-hidden', 'true'); };
+
+  new MutationObserver(() => {
+    const shown = modal.classList.contains('show');
+    if (shown && modal.dataset.open !== '1') {
+      modal.dataset.open = '1';
+      if (!st.editId) { resetForm(); setTimeout(() => search.focus(), 30); }
+      updatePickHint();
+      loadWatch('both');
+    } else if (!shown && modal.dataset.open === '1') {
+      modal.dataset.open = '0';
+      clearTimeout(st.remoteTimer);
+      renderSug([]);
+      // leave the modal clean for the next open: edit state ends with the modal
+      st.editId = ''; st.editWorkMeeting = '';
+      titleEl.textContent = 'Thêm ca làm việc';
+      saveBtn.innerHTML = ADD_LABEL;
+    }
+  }).observe(modal, { attributes: true, attributeFilter: ['class'] });
+
+  // Reuse this modal to edit an existing shift (called from the list's edit button)
+  window.openWorkMeetingModalInEditMode = (row) => {
+    resetForm();
+    st.editId = String(row.id || '');
+    st.editWorkMeeting = row.work_meeting || '';   // kept as it was, never shown, never wiped
+
+    st.email = String(row.teacher_email || '').trim().toLowerCase();
+    st.name = row.teacher_name || '';
+    if (st.email) {
+      showTeacher();
+      linkInput.value = row.meeting_link || '';
+      syncOpenLink();
+      evalRoom();   // shows what watch says; fills the link only if the row has none
+    }
+
+    dateInput.value = row.work_date || '';
+    startInput.value = String(row.start_time || '').slice(0, 5);
+    endInput.value = String(row.end_time || '').slice(0, 5);
+    { const s = tGet(startInput), e = tGet(endInput); if (s != null && e != null && e > s) lastDur = e - s; }
+    paintTime();
+    if (deptSelect) deptSelect.value = row.department || '';
+    if (recChk) recChk.checked = !row.is_one_time;
+
+    titleEl.textContent = 'Sửa ca làm việc';
+    saveBtn.innerHTML = SAVE_LABEL;
+    updateSave();
+
     modal.classList.add('show');
     modal.setAttribute('aria-hidden', 'false');
-    emailInput?.focus();
-
-    // Prefill date/time nicely
-    const d = modal.querySelector('#wmDate');
-    const s = modal.querySelector('#wmStart');
-    const e = modal.querySelector('#wmEnd');
-    if (d && !d.value) d.value = new Date().toISOString().slice(0, 10);
-    if (s && !s.value) s.value = '09:00';
-    if (e && !e.value) e.value = '10:00';
-
   };
-  const close = () => {
-    modal.classList.remove('show');
-    modal.setAttribute('aria-hidden', 'true');
-    clearTimeout(debounceId);
-    renderSuggestions([]);
-
-    // reset edit state back to default "Add"
-    delete modal.dataset.editId;
-    modal.querySelector('#wmTitle').textContent = 'Add work meeting';
-    saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Add';
-  };
-
 
   fab.addEventListener('click', async () => {
     const verified = await askSecurityKey('add a work meeting');
     if (!verified) return;
     open();
   });
-  modal.querySelector('#wmOverlay').addEventListener('click', close);
-  modal.querySelector('#wmClose').addEventListener('click', close);
-  modal.querySelector('#wmCancel').addEventListener('click', close);
-
-  // 4) Elements + helpers
-  const emailInput = modal.querySelector('#wmEmail');
-  const nameInput = modal.querySelector('#wmName');
-  const meetInput = modal.querySelector('#wmMeetingLink');
-  const workInput = modal.querySelector('#wmWorkMeeting');
-  const sugBox = modal.querySelector('#wmEmailSug');
-  const saveBtn = modal.querySelector('#wmSave');
-  const savingLay = modal.querySelector('#wmSaving');
-  const deptSelect = modal.querySelector('#wmDept');
-
-
-  // Reuse the "Add work meeting" modal to edit an existing row
-  window.openWorkMeetingModalInEditMode = (row) => {
-    // tag modal as "editing"
-    modal.dataset.editId = row.id;
-
-    // prefill fields
-    emailInput.value = row.teacher_email || '';
-    nameInput.value = row.teacher_name || '';
-    meetInput.value = row.meeting_link || '';
-    workInput.value = row.work_meeting || '';
-
-    modal.querySelector('#wmDate').value = row.work_date || '';
-    modal.querySelector('#wmStart').value = String(row.start_time || '').slice(0, 5);
-    modal.querySelector('#wmEnd').value = String(row.end_time || '').slice(0, 5);
-
-    if (deptSelect) deptSelect.value = row.department || '';
-
-    const rec = modal.querySelector('#wmRecurring');
-    if (rec) rec.checked = !row.is_one_time;
-
-    // tweak UI labels for edit mode
-    modal.querySelector('#wmTitle').textContent = 'Edit work meeting';
-    saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save';
-
-    // show the modal
-    modal.classList.add('show');
-    modal.setAttribute('aria-hidden', 'false');
-  };
-
-
-  let debounceId;
-
-  function renderSuggestions(list) {
-    if (!Array.isArray(list) || list.length === 0) {
-      sugBox.innerHTML = '';
-      sugBox.style.display = 'none';
-      return;
-    }
-    sugBox.innerHTML = list.map(email => `
-      <div class="suggestion-item" role="option" data-email="${email}">
-        <i class="fa-solid fa-user"></i> ${email}
-      </div>`).join('');
-    sugBox.style.display = 'block';
-  }
-
-  async function authToken() {
-    const { data: { session } } = await client.auth.getSession();
-    return session?.access_token || null;
-  }
-
-  // 5) Debounced (1s) suggestions from meeting_links.teacher_email
-  emailInput.addEventListener('input', () => {
-    const q = emailInput.value.trim();
-    clearTimeout(debounceId);
-
-    if (q.length < 4) {
-      renderSuggestions([]);
-      return;
-    }
-
-    debounceId = setTimeout(async () => {
-      try {
-        const token = await authToken();
-        if (!token) return renderSuggestions([]);
-        const res = await fetch(`${_DO}/meetinglinks-search?q=${encodeURIComponent(q)}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!res.ok) return renderSuggestions([]);
-        const { suggestions } = await res.json();
-        renderSuggestions(suggestions || []);
-      } catch {
-        renderSuggestions([]);
-      }
-    }, 1000);
-  });
-
-  // 6) Choose suggestion → fill + fetch details (name/links)
-  sugBox.addEventListener('click', async (e) => {
-    const item = e.target.closest('.suggestion-item');
-    if (!item) return;
-    const email = item.dataset.email;
-    emailInput.value = email;
-    renderSuggestions([]);
-
-    try {
-      const token = await authToken();
-      if (!token) return;
-      const r = await fetch(`${_DO}/meetinglink-by-email?email=${encodeURIComponent(email)}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!r.ok) return;
-      const { teacher_name, link_meeting, link_work_meeting } = await r.json();
-      nameInput.value = teacher_name || '';
-      meetInput.value = link_meeting || '';
-      workInput.value = link_work_meeting || '';
-    } catch { /* ignore */ }
-  });
-
-  // 7) If user types full email and leaves field, try to fetch details
-  emailInput.addEventListener('blur', async () => {
-    const email = emailInput.value.trim();
-    if (!email || !email.includes('@')) return;
-    try {
-      const token = await authToken();
-      if (!token) return;
-      const r = await fetch(`${_DO}/meetinglink-by-email?email=${encodeURIComponent(email)}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!r.ok) return;
-      const { teacher_name, link_meeting, link_work_meeting } = await r.json();
-      nameInput.value = teacher_name || '';
-      meetInput.value = link_meeting || '';
-      workInput.value = link_work_meeting || '';
-    } catch { /* ignore */ }
-  });
+  qs('#wmOverlay').addEventListener('click', close);
+  qs('#wmClose').addEventListener('click', close);
+  qs('#wmCancel').addEventListener('click', close);
 
   // Close suggestions when clicking outside the content area
   modal.addEventListener('click', (ev) => {
     const inside = ev.target.closest('.modal-content');
-    if (!inside) renderSuggestions([]);
+    if (!inside) renderSug([]);
   });
 
   // ESC to close
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
 
-  // 8) Save → call serverless addworkmeeting
+  // 4) Save → /addworkmeeting, or /editcalendar in edit mode. Same payload keys as before.
   saveBtn.addEventListener('click', async () => {
-    const isRecurring = !!modal.querySelector('#wmRecurring')?.checked;
+    const isRecurring = !!recChk?.checked;
+    const tS = tFormat(startInput), tE = tFormat(endInput); paintTime();
+    if (tS == null || tE == null) {
+      return showMsg('Giờ chưa hợp lệ. Gõ dạng 09:30, hoặc chọn bằng các nút giờ.', 'error');
+    }
 
     const payload = {
-      teacherEmail: emailInput.value.trim(),
-      teacherName: nameInput.value.trim(),
-      meetingLink: meetInput.value.trim(),
-      workMeeting: workInput.value.trim(),
-      workDate: modal.querySelector('#wmDate').value,   // YYYY-MM-DD
-      startTime: modal.querySelector('#wmStart').value,  // HH:MM
-      endTime: modal.querySelector('#wmEnd').value,    // HH:MM
+      teacherEmail: st.email,
+      teacherName: st.name || '',
+      meetingLink: linkInput.value.trim(),
+      workMeeting: st.editId ? st.editWorkMeeting : '',
+      workDate: dateInput.value,    // YYYY-MM-DD
+      startTime: startInput.value,  // HH:MM
+      endTime: endInput.value,      // HH:MM
       isOneTime: !isRecurring,
       department: (deptSelect?.value || '').trim(),
-
     };
 
-
-
-
-    if (!payload.teacherEmail) return showMsg('Please choose a teacher email first.', 'error');
+    if (!payload.teacherEmail) return showMsg('Vui lòng chọn giáo viên trước.', 'error');
     if (!payload.workDate || !payload.startTime || !payload.endTime) {
-      return showMsg('Please choose date, start time and end time.', 'error');
+      return showMsg('Vui lòng chọn ngày, giờ bắt đầu và giờ kết thúc.', 'error');
     }
     if (payload.startTime >= payload.endTime) {
-      return showMsg('End time must be later than start time.', 'error');
+      return showMsg('Giờ kết thúc phải sau giờ bắt đầu.', 'error');
     }
 
     const confirmMsg = isRecurring
@@ -1102,41 +1338,30 @@ function setupWorkingFabModal() {
     saveBtn.disabled = false;
     if (!ok) return;
 
-
-
-    if (!payload.teacherEmail) {
-      const msg = document.getElementById('message');
-      if (msg) { msg.textContent = 'Please choose a teacher email first.'; msg.className = 'error'; }
-      return;
-    }
-
     try {
       saveBtn.disabled = true;
       savingLay?.removeAttribute('hidden');
 
-      const token = await authToken();
-      if (!token) throw new Error('No session. Please log in again.');
+      const token = await wlToken();
+      if (!token) throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
 
       let endpoint = _DO + '/addworkmeeting';
       let method = 'POST';
-      if (modal.dataset.editId) {
+      if (st.editId) {
         // edit mode → send id and switch to editcalendar
-        payload.id = modal.dataset.editId;
+        payload.id = st.editId;
         endpoint = _DO + '/editcalendar';
         method = 'PUT';
       }
 
-      const res = await fetch(endpoint, {
+      const send = (body) => fetch(endpoint, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(body)
       });
 
-
-const out = await res.json().catch(() => ({}));
+      const res = await send(payload);
+      const out = await res.json().catch(() => ({}));
 
       // --- Handle overlap warning ---
       if (out?.overlap && out?.conflicts?.length) {
@@ -1148,49 +1373,29 @@ const out = await res.json().catch(() => ({}));
         saveBtn.disabled = true;
         savingLay?.removeAttribute('hidden');
         payload.forceOverlap = true;
-        const res2 = await fetch(endpoint, {
-          method,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(payload)
-        });
+        const res2 = await send(payload);
         const out2 = await res2.json().catch(() => ({}));
-        if (!res2.ok || !out2?.ok) throw new Error(out2?.error || 'Save failed');
+        if (!res2.ok || !out2?.ok) throw new Error(out2?.error || 'Lưu thất bại');
         close();
-        const msg2 = document.getElementById('message');
-        if (msg2) {
-          msg2.textContent = 'Saved!';
-          msg2.className = 'success';
-          setTimeout(() => { msg2.textContent = ''; msg2.className = ''; }, 1400);
-          loadWorkMeetings();
-        }
+        flash('Đã lưu ca làm việc.', 'success');
+        loadWorkMeetings();
         return;
       }
 
-      if (!res.ok || !out?.ok) throw new Error(out?.error || 'Save failed');
+      if (!res.ok || !out?.ok) throw new Error(out?.error || 'Lưu thất bại');
 
       close();
-      const msg = document.getElementById('message');
-      if (msg) {
-        msg.textContent = 'Saved!';
-        msg.className = 'success';
-        setTimeout(() => { msg.textContent = ''; msg.className = ''; }, 1400);
-        loadWorkMeetings(); // refresh list on the main page
-      }
+      flash('Đã lưu ca làm việc.', 'success');
+      loadWorkMeetings(); // refresh list on the main page
     } catch (err) {
-      const msg = document.getElementById('message');
-      if (msg) { msg.textContent = String(err?.message || err); msg.className = 'error'; }
+      flash(String(err?.message || err), 'error');
     } finally {
       savingLay?.setAttribute('hidden', '');
-      saveBtn.disabled = false;
+      updateSave();
     }
   });
-
-  modal.dataset.wired = 'true';
-
 }
+/* === tansinh watch-link v3 END === */
 
 
 function showMsg(text, type) {
@@ -4016,18 +4221,7 @@ function setupSidebar() {
     }
   });
 
-  // Sidebar Add Meeting button (Admin only)
-  const addMeetingBtn = document.getElementById('sidebarAddMeeting');
-  addMeetingBtn?.addEventListener('click', async () => {
-    closeSidebar();
-    const verified = await askSecurityKey('add a work meeting');
-    if (!verified) return;
-    const modal = document.getElementById('fabModal');
-    if (modal) {
-      modal.classList.add('show');
-      modal.setAttribute('aria-hidden', 'false');
-    }
-  });
+  // tansinh watch-link v3: the sidebar "Thêm meeting link" button and its handler were removed on 10 Oct 2026.
 
   // Sidebar Add Working button (Admin only)
   const addWorkingBtn = document.getElementById('sidebarAddWorking');
