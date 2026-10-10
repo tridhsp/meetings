@@ -12,17 +12,18 @@
   <link rel="icon" type="image/png" sizes="32x32"
     href="https://files.tansinh.info/ads/tridhsp_1752750602636_ad_tridhsp_1752750602636.png" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=20261009_2309_1218_1544" />
+  <link rel="stylesheet" href="style.css?v=20261010_sb1" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
   <!-- Supabase UMD build -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.4/dist/umd/supabase.js" defer></script>
- <script src="script.js?v=20261009_2309_1218_1544" defer></script>
+ <script src="script.js?v=20261010_1021_2309_1218_1544" defer></script>
 <script>window.addEventListener('pageshow', function(e) { if (e.persisted) location.reload(); });</script>
 
 </head>
 
 <body>
+  <script src="sidebar.js?v=20261010_sb1"></script><!-- tansinh sb-v1: the shared sidebar. Keep this line right after <body>. -->
   <!-- ---------- Login Card ---------- -->
   <div class="card" id="loginCard">
     <div class="logo">Meetings</div>
@@ -41,44 +42,10 @@
     <div id="message" aria-live="polite"></div>
   </div>
 
-  <!-- Sidebar Menu Button (hamburger) -->
-  <button id="sidebarToggle" class="sidebar-toggle" aria-label="Open menu">
-    <i class="fa-solid fa-bars"></i>
-  </button>
-
-
-
-  <!-- Sidebar -->
-  <div id="sidebar" class="sidebar">
-    <div class="sidebar-header">
-      <div class="sidebar-logo">
-        <i class="fa-solid fa-calendar-check"></i>
-        <span>Meetings</span>
-      </div>
-      <button id="sidebarClose" class="sidebar-close" aria-label="Close menu">
-        <i class="fa-solid fa-xmark"></i>
-      </button>
-    </div>
-    
-<nav class="sidebar-nav">
-      <a href="./index.html" class="sidebar-link active">
-        <i class="fa-solid fa-house"></i>
-        <span>Trang chủ</span>
-      </a>
-      <a href="./confirmation.html" class="sidebar-link">
-        <i class="fa-solid fa-calendar-check"></i>
-        <span>Xác nhận lịch</span>
-      </a>
-
-      <a href="./studentmeeting.html" class="sidebar-link">
-        <i class="fa-solid fa-user-graduate"></i>
-        <span>Student Meeting</span>
-      </a>
-      <a href="./offteachers.html" class="sidebar-link">
-        <i class="fa-solid fa-user-slash"></i>
-        <span>GV Nghỉ</span>
-      </a>
-      
+  <!-- === tansinh sb-v1 BEGIN: this page's extra sidebar sections (10 Oct 2026) ===
+       The shared sidebar (sidebar.js) draws the menu itself and moves the two
+       blocks below into it. Keep the ids: script.js wires them up. -->
+  <div id="sidebarPageExtras" hidden>
       <!-- Week Selector Section -->
       <div class="sidebar-section">
         <div class="sidebar-section-title">Chọn tuần xem</div>
@@ -113,18 +80,8 @@
           <span>Thêm ca làm việc</span>
         </button>
       </div>
-    </nav>
-    
-    <div class="sidebar-footer">
-      <button id="sidebarLogout" class="sidebar-logout">
-        <i class="fa-solid fa-power-off"></i>
-        <span>Đăng xuất</span>
-      </button>
-    </div>
   </div>
-  
-  <!-- Sidebar Overlay -->
-  <div id="sidebarOverlay" class="sidebar-overlay"></div>
+  <!-- === tansinh sb-v1 END === -->
 
   <!-- Meeting Links list -->
 
