@@ -604,22 +604,45 @@ function wlInjectStyles() {
 .wl-note{margin-top:10px}
 .wl-note strong{color:#374151;word-break:break-all}
 .wl-note button{margin-left:6px}
-.wl-time-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px}
-.wl-time-head label{margin:0}
-.wl-time-sum{font-size:12px;color:#6b7280;font-variant-numeric:tabular-nums;text-align:right}
-.wl-time-sum.bad{color:#b91c1c;font-weight:600}
-.wl-time-fields{display:flex;align-items:center;gap:8px;margin-bottom:8px}
-.wl-tinput{width:92px;flex:none;text-align:center;font-variant-numeric:tabular-nums;font-size:15px;font-weight:600;padding:8px 10px;font-family:inherit}
-.wl-tinput.bad{border-color:#dc2626}
-.wl-time-arrow{color:#9ca3af}
-.wl-chips{display:flex;flex-wrap:wrap;gap:4px}
-.wl-chip{font-family:inherit;font-size:13px;font-variant-numeric:tabular-nums;line-height:1;padding:7px 0;min-width:40px;text-align:center;border:1px solid #e5e7eb;background:#fff;color:#374151;border-radius:8px;cursor:pointer}
-.wl-chip:hover{border-color:#cbd5e1;background:#f9fafb}
-.wl-chip.on{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
-.wl-chip:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
-.wl-chiprow{display:flex;align-items:flex-start;gap:8px;margin-top:6px}
-.wl-chiplabel{font-size:12px;color:#6b7280;flex:none;width:56px;padding-top:7px}
-.wl-chips--dur .wl-chip{min-width:46px}
+/* tansinh timepick-v1 (11 Oct 2026): presets, stepper fields, drag timeline */
+.wl-presets{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 10px}
+.wl-preset{font-family:inherit;display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;border:1px solid #e5e7eb;background:#fff;color:#374151;font-size:13px;line-height:1;cursor:pointer;font-variant-numeric:tabular-nums}
+.wl-preset b{font-weight:700;color:#111827}
+.wl-preset:hover{border-color:#cbd5e1;background:#f9fafb}
+.wl-preset.on{background:#e0ecff;border-color:#93c5fd;color:#1d4ed8}
+.wl-preset.on b{color:#1d4ed8}
+.wl-preset:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.wl-panel{border:1px solid #e5e7eb;border-radius:12px;background:#f8fafc;padding:12px 14px 8px}
+.wl-fields{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}
+.wl-field{display:flex;flex-direction:column;gap:4px}
+.wl-field>span{font-size:12px;color:#6b7280}
+.wl-step{display:flex;align-items:center;border:1px solid #e5e7eb;border-radius:10px;background:#fff;overflow:hidden}
+.wl-step:focus-within{border-color:var(--primary);box-shadow:0 0 0 3px rgba(59,130,246,.15)}
+.wl-step.bad{border-color:#dc2626}
+.wl-tinput{width:84px;flex:none;text-align:center;font-variant-numeric:tabular-nums;font-size:18px;font-weight:700;padding:8px 2px;border:none;border-radius:0;background:transparent;font-family:inherit;color:#111827}
+.wl-tinput:focus{outline:none;box-shadow:none}
+.wl-stepbtn{font-family:inherit;width:34px;height:40px;border:none;background:transparent;color:#6b7280;font-size:18px;line-height:1;cursor:pointer;flex:none;padding:0}
+.wl-stepbtn:hover{background:#f3f4f6;color:#111827}
+.wl-stepbtn:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+.wl-time-arrow{color:#9ca3af;padding-bottom:12px}
+.wl-dur{margin-left:auto;padding-bottom:11px;font-size:13px;color:#6b7280;font-variant-numeric:tabular-nums;white-space:nowrap}
+.wl-dur b{color:#111827;font-weight:700}
+.wl-dur.bad{color:#b91c1c;font-weight:600}
+.wl-bar{margin-top:12px;padding:0 11px;touch-action:none;user-select:none;-webkit-user-select:none}
+.wl-ticks{position:relative;height:16px;font-size:11px;color:#9ca3af;font-variant-numeric:tabular-nums;pointer-events:none}
+.wl-tick{position:absolute;top:0;transform:translateX(-50%)}
+.wl-track{position:relative;height:38px;cursor:pointer}
+.wl-track::before{content:"";position:absolute;left:0;right:0;top:15px;height:8px;border-radius:999px;background:#e5e7eb}
+.wl-hourmark{position:absolute;top:25px;width:1px;height:5px;background:#cbd5e1;transform:translateX(-50%);pointer-events:none}
+.wl-band{position:absolute;top:12px;height:14px;border-radius:999px;background:var(--primary);cursor:grab}
+.wl-band.dragging{cursor:grabbing}
+.wl-handle{position:absolute;top:8px;width:22px;height:22px;border-radius:50%;background:#fff;border:2px solid var(--primary);box-shadow:0 1px 4px rgba(16,24,40,.25);transform:translateX(-50%);cursor:ew-resize;padding:0;z-index:2}
+.wl-handle:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.wl-handle::after{content:attr(data-tip);position:absolute;bottom:28px;left:50%;transform:translateX(-50%);background:#111827;color:#fff;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;padding:3px 7px;border-radius:6px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .12s}
+.wl-handle.dragging::after,.wl-handle:focus-visible::after{opacity:1}
+.wl-track.dragging,.wl-track.dragging *{cursor:grabbing}
+@media (max-width:480px){.wl-tick--minor{display:none}.wl-tinput{width:66px;font-size:16px}.wl-stepbtn{width:28px}.wl-dur{margin-left:0;width:100%;padding:4px 0 0}}
+@media (prefers-reduced-motion:reduce){.wl-handle::after{transition:none}}
 `;
   document.head.appendChild(st);
 }
@@ -737,30 +760,41 @@ function setupWorkingFabModal() {
             <input type="date" id="wmDate" class="input" required />
           </div>
 
-          <!-- Working time: typed 24h fields + chips. No browser time picker. -->
+          <!-- Working time (tansinh timepick-v1): Sáng/Chiều/Tối presets, typed 24h fields with − + buttons, and a timeline you can drag. No browser time picker. -->
           <div class="form-group wl-time">
-            <div class="wl-time-head">
-              <label for="wmStart">Giờ làm việc</label>
-              <span class="wl-time-sum" id="wlTimeSum" aria-live="polite"></span>
+            <label for="wmStart">Giờ làm việc</label>
+            <div class="wl-presets" id="wlPresets" role="group" aria-label="Ca mẫu"></div>
+            <div class="wl-panel">
+              <div class="wl-fields">
+                <div class="wl-field">
+                  <span>Bắt đầu</span>
+                  <div class="wl-step" id="wlStartStep">
+                    <button type="button" class="wl-stepbtn" data-step="start" data-dir="-1" aria-label="Bắt đầu sớm hơn 15 phút" title="Sớm hơn 15 phút">−</button>
+                    <input type="text" id="wmStart" class="wl-tinput" inputmode="numeric" placeholder="09:00" autocomplete="off" aria-label="Giờ bắt đầu" />
+                    <button type="button" class="wl-stepbtn" data-step="start" data-dir="1" aria-label="Bắt đầu muộn hơn 15 phút" title="Muộn hơn 15 phút">+</button>
+                  </div>
+                </div>
+                <span class="wl-time-arrow" aria-hidden="true">→</span>
+                <div class="wl-field">
+                  <span>Kết thúc</span>
+                  <div class="wl-step" id="wlEndStep">
+                    <button type="button" class="wl-stepbtn" data-step="end" data-dir="-1" aria-label="Kết thúc sớm hơn 15 phút" title="Sớm hơn 15 phút">−</button>
+                    <input type="text" id="wmEnd" class="wl-tinput" inputmode="numeric" placeholder="10:00" autocomplete="off" aria-label="Giờ kết thúc" />
+                    <button type="button" class="wl-stepbtn" data-step="end" data-dir="1" aria-label="Kết thúc muộn hơn 15 phút" title="Muộn hơn 15 phút">+</button>
+                  </div>
+                </div>
+                <div class="wl-dur" id="wlDur" aria-live="polite"></div>
+              </div>
+              <div class="wl-bar" id="wlBar">
+                <div class="wl-ticks" id="wlTicks" aria-hidden="true"></div>
+                <div class="wl-track" id="wlTrack">
+                  <div class="wl-band" id="wlBand" title="Kéo để dời cả ca"></div>
+                  <button type="button" class="wl-handle" id="wlHandleS" role="slider" aria-label="Giờ bắt đầu" aria-valuemin="0" aria-valuemax="1439" title="Kéo để đổi giờ bắt đầu"></button>
+                  <button type="button" class="wl-handle" id="wlHandleE" role="slider" aria-label="Giờ kết thúc" aria-valuemin="0" aria-valuemax="1439" title="Kéo để đổi giờ kết thúc"></button>
+                </div>
+              </div>
             </div>
-            <div class="wl-time-fields">
-              <input type="text" id="wmStart" class="input wl-tinput" inputmode="numeric" placeholder="09:00" autocomplete="off" aria-label="Giờ bắt đầu" />
-              <span class="wl-time-arrow" aria-hidden="true">→</span>
-              <input type="text" id="wmEnd" class="input wl-tinput" inputmode="numeric" placeholder="10:00" autocomplete="off" aria-label="Giờ kết thúc" />
-            </div>
-            <div class="wl-chiprow">
-              <span class="wl-chiplabel">giờ</span>
-              <div class="wl-chips" id="wlHours" aria-label="Chọn giờ bắt đầu"></div>
-            </div>
-            <div class="wl-chiprow">
-              <span class="wl-chiplabel">phút</span>
-              <div class="wl-chips" id="wlMinutes" aria-label="Chọn phút bắt đầu"></div>
-            </div>
-            <div class="wl-chiprow">
-              <span class="wl-chiplabel">kéo dài</span>
-              <div class="wl-chips wl-chips--dur" id="wlDurs" aria-label="Chọn thời lượng, giờ kết thúc tự tính"></div>
-            </div>
-            <p class="hint">Chọn giờ rồi chọn thời lượng, giờ kết thúc tự tính. Gõ 9, 930 hay 9h30 đều được; phím ↑↓ đổi 15 phút.</p>
+            <p class="hint">Bấm ca mẫu, kéo thanh thời gian, bấm − +, hoặc gõ giờ (9h30, 930 đều được). Dời giờ bắt đầu thì giờ kết thúc dời theo.</p>
           </div>
 
           <!-- Repeat (weekly) -->
@@ -824,14 +858,22 @@ function setupWorkingFabModal() {
   const ADD_LABEL  = '<i class="fa-solid fa-plus"></i> Thêm ca';
   const SAVE_LABEL = '<i class="fa-solid fa-floppy-disk"></i> Lưu';
 
-  // --- the time picker: typed 24h fields, hour/minute chips for the start, duration chips for the end ---
-  const sumEl   = qs('#wlTimeSum');
-  const hoursEl = qs('#wlHours');
-  const minsEl  = qs('#wlMinutes');
-  const dursEl  = qs('#wlDurs');
-  const HOURS = Array.from({ length: 17 }, (_, i) => i + 6);   // 06 … 22
-  const MINS  = [0, 15, 30, 45];
-  const DURS  = [30, 45, 60, 75, 90, 120, 150, 180];            // minutes
+  // --- the time picker (tansinh timepick-v1, 11 Oct 2026): Sáng/Chiều/Tối presets, typed 24h fields with
+  //     − + buttons, and a timeline with two handles you can drag. The hour/minute/duration chips it
+  //     replaces are kept in patch-meetings-timepick.py; its undo puts them back byte for byte. ---
+  const durEl     = qs('#wlDur');
+  const presetsEl = qs('#wlPresets');
+  const startStep = qs('#wlStartStep');
+  const endStep   = qs('#wlEndStep');
+  const ticksEl   = qs('#wlTicks');
+  const trackEl   = qs('#wlTrack');
+  const bandEl    = qs('#wlBand');
+  const handleS   = qs('#wlHandleS');
+  const handleE   = qs('#wlHandleE');
+  const STEP = 15;                                 // every control moves in 15-minute steps
+  const BAR_LO = 6 * 60, BAR_HI = 23 * 60;         // the timeline shows 06:00 → 23:00; it widens only when a shift falls outside
+  const DAY_MAX = 23 * 60 + 59;
+  let barLo = BAR_LO, barHi = BAR_HI;
   let lastDur = 60;   // the end follows the start by this many minutes; survives between shifts
 
   // "9" "09" "930" "0930" "9:30" "9h30" "9g30" "9.30" "9:3" -> minutes since midnight, or null
@@ -862,24 +904,76 @@ function setupWorkingFabModal() {
     const h = Math.floor(d / 60), m = d % 60;
     return (h ? h + ' giờ' : '') + (h && m ? ' ' : '') + (m ? m + ' phút' : '');
   }
-  function durChip(d) {
-    const h = Math.floor(d / 60), m = d % 60;
-    return h ? (h + 'g' + (m ? String(m).padStart(2, '0') : '')) : (m + 'p');
+
+  // The three school shifts, read from ROSTER_SHIFTS so the presets can never drift from the roster grid.
+  const PRESET_NAMES = { morning: 'Sáng', afternoon: 'Chiều', evening: 'Tối' };
+  function presetList() {
+    let src = null;
+    try { src = ROSTER_SHIFTS; } catch (e) { src = null; }
+    if (!Array.isArray(src) || !src.length) {
+      src = [{ key: 'morning', start: '08:00', end: '12:00' }, { key: 'afternoon', start: '15:00', end: '18:00' }, { key: 'evening', start: '18:00', end: '21:00' }];
+    }
+    return src.map(p => ({ name: PRESET_NAMES[p.key] || String(p.key || ''), s: tParse(p.start), e: tParse(p.end) }))
+              .filter(p => p.s != null && p.e != null && p.e > p.s);
   }
-  hoursEl.innerHTML = HOURS.map(h => '<button type="button" class="wl-chip" data-h="' + h + '">' + String(h).padStart(2, '0') + '</button>').join('');
-  minsEl.innerHTML  = MINS.map(m => '<button type="button" class="wl-chip" data-m="' + m + '">' + String(m).padStart(2, '0') + '</button>').join('');
-  dursEl.innerHTML  = DURS.map(d => '<button type="button" class="wl-chip" data-d="' + d + '">' + durChip(d) + '</button>').join('');
+  const PRESETS = presetList();
+  presetsEl.innerHTML = PRESETS.map((p, i) =>
+    '<button type="button" class="wl-preset" data-i="' + i + '"><b>' + wlEsc(p.name) + '</b>' + tFmt(p.s) + '–' + tFmt(p.e) + '</button>'
+  ).join('');
+
+  // --- the timeline: percent positions, so it paints correctly even while the modal is hidden ---
+  function pctOf(min) { return ((min - barLo) / (barHi - barLo)) * 100; }
+  function minAtX(clientX) {
+    const r = trackEl.getBoundingClientRect();
+    if (!r.width) return null;
+    const f = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
+    return Math.round((barLo + f * (barHi - barLo)) / STEP) * STEP;
+  }
+  function buildTicks() {
+    const span = barHi - barLo, h0 = barLo / 60;
+    let labels = '', marks = '';
+    for (let h = h0; h * 60 <= barHi; h++) {
+      const pct = (((h * 60 - barLo) / span) * 100).toFixed(3) + '%';
+      marks += '<i class="wl-hourmark" style="left:' + pct + '"></i>';
+      if ((h - h0) % 2) continue;                                   // a label every two hours
+      const minor = (h - h0) % 4 ? ' wl-tick--minor' : '';          // on a phone, only every four
+      labels += '<span class="wl-tick' + minor + '" style="left:' + pct + '">' + String(h).padStart(2, '0') + '</span>';
+    }
+    ticksEl.innerHTML = labels;
+    trackEl.querySelectorAll('.wl-hourmark').forEach(n => n.remove());
+    trackEl.insertAdjacentHTML('afterbegin', marks);
+  }
+  // Widen the bar when a shift (an edited one, say) sits outside 06:00–23:00.
+  function fitBar(s, e) {
+    let lo = BAR_LO, hi = BAR_HI;
+    if (s != null) { lo = Math.min(lo, Math.floor(s / 60) * 60); hi = Math.max(hi, Math.min(24 * 60, Math.ceil((s + 1) / 60) * 60)); }
+    if (e != null) { hi = Math.max(hi, Math.min(24 * 60, Math.ceil(e / 60) * 60)); }
+    if (lo !== barLo || hi !== barHi || !ticksEl.childElementCount) { barLo = lo; barHi = hi; buildTicks(); }
+  }
 
   function paintTime(editing) {
     const s = tGet(startInput), e = tGet(endInput);
-    hoursEl.querySelectorAll('[data-h]').forEach(b => b.classList.toggle('on', s != null && +b.dataset.h === Math.floor(s / 60)));
-    minsEl.querySelectorAll('[data-m]').forEach(b => b.classList.toggle('on', s != null && +b.dataset.m === s % 60));
-    dursEl.querySelectorAll('[data-d]').forEach(b => b.classList.toggle('on', s != null && e != null && e - s === +b.dataset.d));
-    startInput.classList.toggle('bad', editing !== startInput && startInput.value.trim() !== '' && s == null);
-    endInput.classList.toggle('bad', editing !== endInput && endInput.value.trim() !== '' && (e == null || (s != null && e <= s)));
-    if (s == null || e == null) { sumEl.textContent = 'Chọn giờ bắt đầu và kết thúc.'; sumEl.classList.remove('bad'); }
-    else if (e <= s) { sumEl.textContent = 'Giờ kết thúc phải sau giờ bắt đầu.'; sumEl.classList.add('bad'); }
-    else { sumEl.textContent = tFmt(s) + ' – ' + tFmt(e) + ' · ' + durText(e - s); sumEl.classList.remove('bad'); }
+    fitBar(s, e);
+    startStep.classList.toggle('bad', editing !== startInput && startInput.value.trim() !== '' && s == null);
+    endStep.classList.toggle('bad', editing !== endInput && endInput.value.trim() !== '' && (e == null || (s != null && e <= s)));
+    presetsEl.querySelectorAll('[data-i]').forEach(b => { const p = PRESETS[+b.dataset.i]; b.classList.toggle('on', !!p && s === p.s && e === p.e); });
+    const sv = s == null ? null : Math.min(barHi, Math.max(barLo, s));
+    const ev = e == null ? null : Math.min(barHi, Math.max(barLo, e));
+    const ok = sv != null && ev != null && ev > sv;
+    bandEl.style.left  = pctOf(sv == null ? barLo : sv) + '%';
+    bandEl.style.width = (ok ? pctOf(ev) - pctOf(sv) : 0) + '%';
+    handleS.style.left = pctOf(sv == null ? barLo : sv) + '%';
+    handleE.style.left = pctOf(ev == null ? (sv == null ? barLo : sv) : ev) + '%';
+    handleS.hidden = s == null;
+    handleE.hidden = e == null;
+    [[handleS, s], [handleE, e]].forEach(([h, v]) => {
+      h.setAttribute('aria-valuenow', v == null ? '0' : String(v));
+      h.setAttribute('aria-valuetext', v == null ? '' : tFmt(v));
+      h.dataset.tip = v == null ? '' : tFmt(v);
+    });
+    if (s == null || e == null) { durEl.textContent = 'Chọn giờ bắt đầu và kết thúc'; durEl.classList.remove('bad'); }
+    else if (e <= s) { durEl.textContent = 'Kết thúc phải sau bắt đầu'; durEl.classList.add('bad'); }
+    else { durEl.innerHTML = '<b>' + wlEsc(durText(e - s)) + '</b>'; durEl.classList.remove('bad'); }
   }
   // Moving the start keeps the shift the same length.
   function setStart(min) {
@@ -909,22 +1003,109 @@ function setupWorkingFabModal() {
     const s = tGet(startInput);
     if (s != null && v > s) lastDur = v - s;
   }
-  hoursEl.addEventListener('click', (e) => {
-    const b = e.target.closest('[data-h]'); if (!b) return;
-    const cur = tGet(startInput);
-    setStart(+b.dataset.h * 60 + (cur == null ? 0 : cur % 60));
+
+  // − and + move 15 minutes; a time off the grid lands on the grid first.
+  function stepField(which, dir) {
+    const isS = which === 'start';
+    const cur = isS ? tGet(startInput) : tGet(endInput);
+    if (cur == null) {
+      const s = tGet(startInput);
+      if (isS) setStart(9 * 60); else setEnd((s == null ? 9 * 60 : s) + (lastDur > 0 ? lastDur : 60));
+      return;
+    }
+    const next = cur % STEP === 0 ? cur + dir * STEP : (dir > 0 ? Math.ceil(cur / STEP) : Math.floor(cur / STEP)) * STEP;
+    if (next < 0 || next > DAY_MAX) return;
+    if (isS) setStart(next); else setEnd(next);
+  }
+  modal.querySelectorAll('.wl-stepbtn').forEach(b => b.addEventListener('click', () => stepField(b.dataset.step, +b.dataset.dir)));
+  presetsEl.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-i]'); if (!b) return;
+    const p = PRESETS[+b.dataset.i]; if (!p) return;
+    lastDur = p.e - p.s;
+    startInput.value = tFmt(p.s);
+    endInput.value = tFmt(p.e);
+    paintTime();
   });
-  minsEl.addEventListener('click', (e) => {
-    const b = e.target.closest('[data-m]'); if (!b) return;
-    const cur = tGet(startInput);
-    setStart((cur == null ? 9 : Math.floor(cur / 60)) * 60 + (+b.dataset.m));
+
+  // Dragging: a handle moves its own end of the shift; the blue band slides the whole shift; a press on the
+  // empty track jumps the nearer handle there. Pointer capture keeps the drag alive outside the track.
+  let drag = null;
+  function dragTeach() {
+    const s = tGet(startInput), e = tGet(endInput);
+    if (s != null && e != null && e > s) lastDur = e - s;
+  }
+  function dragMove(ev) {
+    if (!drag || ev.pointerId !== drag.id) return;
+    const at = minAtX(ev.clientX); if (at == null) return;
+    const s = tGet(startInput), e = tGet(endInput);
+    if (drag.kind === 'band') {
+      let ns = Math.round((at - drag.grab) / STEP) * STEP;
+      ns = Math.max(barLo, Math.min(barHi - drag.dur, ns));
+      if (ns !== s) { startInput.value = tFmt(ns); endInput.value = tFmt(ns + drag.dur); paintTime(); }
+    } else if (drag.kind === 'start') {
+      const v = Math.min(at, (e == null ? barHi : e) - STEP);
+      if (v !== s) { startInput.value = tFmt(v); paintTime(); }
+    } else {
+      const v = Math.max(at, (s == null ? barLo : s) + STEP);
+      if (v !== e) { endInput.value = tFmt(v); paintTime(); }
+    }
+  }
+  function dragEnd(ev) {
+    if (!drag || (ev && ev.pointerId !== drag.id)) return;
+    const id = drag.id;
+    drag = null;
+    try { trackEl.releasePointerCapture(id); } catch (e2) { /* already released */ }
+    trackEl.classList.remove('dragging'); handleS.classList.remove('dragging'); handleE.classList.remove('dragging'); bandEl.classList.remove('dragging');
+    dragTeach();
+    paintTime();
+  }
+  trackEl.addEventListener('pointerdown', (ev) => {
+    if (ev.button != null && ev.button !== 0) return;
+    let s = tGet(startInput), e = tGet(endInput);
+    const at = minAtX(ev.clientX); if (at == null) return;
+    if (s == null || e == null || e <= s) {           // nothing to grab yet: start a shift where the finger is
+      s = Math.max(barLo, Math.min(barHi - STEP, at));
+      e = Math.min(barHi, s + (lastDur > 0 ? lastDur : 60));
+      if (e <= s) e = s + STEP;
+      startInput.value = tFmt(s); endInput.value = tFmt(e); paintTime();
+    }
+    let kind;
+    if (ev.target === handleS) kind = 'start';
+    else if (ev.target === handleE) kind = 'end';
+    else if (ev.target === bandEl) kind = 'band';
+    else kind = Math.abs(at - s) <= Math.abs(at - e) ? 'start' : 'end';
+    drag = { kind: kind, id: ev.pointerId, dur: e - s, grab: at - s };
+    trackEl.classList.add('dragging');
+    (kind === 'start' ? handleS : kind === 'end' ? handleE : bandEl).classList.add('dragging');
+    try { trackEl.setPointerCapture(ev.pointerId); } catch (e2) { /* fine without capture */ }
+    ev.preventDefault();
+    dragMove(ev);
   });
-  dursEl.addEventListener('click', (e) => {
-    const b = e.target.closest('[data-d]'); if (!b) return;
-    lastDur = +b.dataset.d;
-    const s = tGet(startInput);
-    if (s != null) setEnd(s + lastDur); else paintTime();
+  trackEl.addEventListener('pointermove', dragMove);
+  trackEl.addEventListener('pointerup', dragEnd);
+  trackEl.addEventListener('pointercancel', dragEnd);
+  // Keyboard on a handle: ← → move 15 minutes, with Shift one hour. A handle moves only its own end.
+  [handleS, handleE].forEach((h) => {
+    h.addEventListener('keydown', (e) => {
+      let step = 0;
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') step = -STEP;
+      else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') step = STEP;
+      if (!step) return;
+      e.preventDefault();
+      if (e.shiftKey) step *= 4;
+      const s = tGet(startInput), en = tGet(endInput);
+      if (h === handleS) {
+        if (s == null) return;
+        startInput.value = tFmt(Math.max(0, Math.min(s + step, (en == null ? DAY_MAX : en) - STEP)));
+      } else {
+        if (en == null) return;
+        endInput.value = tFmt(Math.min(DAY_MAX, Math.max(en + step, (s == null ? 0 : s) + STEP)));
+      }
+      dragTeach();
+      paintTime();
+    });
   });
+
   [startInput, endInput].forEach((inp) => {
     inp.addEventListener('input', () => paintTime(inp));
     inp.addEventListener('blur', () => { tCommit(inp); paintTime(); });
