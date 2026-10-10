@@ -1596,6 +1596,9 @@ const SM_V3 = {
 // rooms. The code is in the sm-v4 block at the end of this file.
 const SM_V4 = {
     ENABLED: true,      // one-word switch: false = the page behaves exactly as sm-v3
+    ROLE_BASED: true,   // true  = show the on-duty Breakout teacher whenever none of her own
+                        //         BREAKOUT-role teachers is live, even if a TTKB answer exists
+                        // false = any live teacher of hers (TTKB included) hides it
     MAX_CHECK: 6,       // how many on-duty teachers to ask for free rooms (one API call each)
     MAX_SHOW: 3         // how many of them to show, most free rooms first
 };
@@ -2068,8 +2071,11 @@ async function smRenderLiveDay(ctx, items, dbDay) {
 
         // === tansinh sm-v4 hook BEGIN (10 Oct 2026) — GV Breakout đang trực ===
         // Shown ONCE per day, at the first slot where nobody of the learner's OWN
-        // teachers (assigned meeting, substitute, main teacher, own breakout
-        // teachers) is working RIGHT NOW. Own teachers that start later today stay
+        // Breakout-role teachers is working RIGHT NOW: her breakout teacher(s), a
+        // breakout substitute, a pinned meeting whose owner is a Breakout/BM
+        // teacher, or — on a "buổi phụ" row — the row's own teacher. A TTKB answer
+        // (pinned TTKB meeting, TTKB substitute, live TTKB teacher) does NOT hide it
+        // while SM_V4.ROLE_BASED is true. Own teachers that start later today stay
         // on screen; the on-duty teacher is added as the "right now" answer.
         if (i === 0) smV4OnDutyEmails = [];
         if (SM_V4.ENABLED && !ctx._smV4Shown && !ctx._smV4AnyLive) {
@@ -2077,11 +2083,20 @@ async function smRenderLiveDay(ctx, items, dbDay) {
                 const smV4SubSt = (sub && subCard && subCard.joinable)
                     ? await statusOf(smLower(sub.substitute_teacher_email), sub.substitute_teacher_name || '', classTime, false)
                     : null;
-                const smV4OwnLive = !!assignedHtml
-                    || !!(smV4SubSt && smV4SubSt.workingNow)
-                    || !!(mainCard && mainCard.joinable && mainSt && mainSt.workingNow)
-                    || await smV4OwnBreakoutLive(ctx, { item, breakoutEmails, brSub, mainEmail, isAux, classTime, statusOf, cardOf });
-                if (smV4OwnLive) {
+                const smV4SubLive = !!(smV4SubSt && smV4SubSt.workingNow);
+                const smV4MainLive = !!(mainCard && mainCard.joinable && mainSt && mainSt.workingNow);
+                const smV4MainIsB = isAux || breakoutEmails.includes(mainEmail);
+                let smV4Covered;
+                if (SM_V4.ROLE_BASED) {
+                    smV4Covered = await smV4AssignedBreakoutLive(ctx)
+                        || (isAux && smV4SubLive)
+                        || (smV4MainIsB && smV4MainLive)
+                        || await smV4OwnBreakoutLive(ctx, { item, breakoutEmails, brSub, mainEmail, isAux, classTime, statusOf, cardOf });
+                } else {
+                    smV4Covered = !!assignedHtml || smV4SubLive || smV4MainLive
+                        || await smV4OwnBreakoutLive(ctx, { item, breakoutEmails, brSub, mainEmail, isAux, classTime, statusOf, cardOf });
+                }
+                if (smV4Covered) {
                     ctx._smV4AnyLive = true;
                 } else {
                     const smV4Skip = new Set([mainEmail, ...breakoutEmails, ...usedBreakout,
@@ -2097,7 +2112,7 @@ async function smRenderLiveDay(ctx, items, dbDay) {
                             if (String(blocks[k]).indexOf('<div class="sm-call') === 0) blocks.splice(k, 1);
                         }
                         blocks.push(od.html);
-                        strip = smV4Strip(strip, { answered, relaxed, mainSt, mainName, classTime, count: od.count, DB_DAY_LABELS, todayDOW, todayYMD });
+                        strip = smV4Strip(strip, { answered, relaxed, isAux, mainSt, mainName, classTime, count: od.count, DB_DAY_LABELS, todayDOW, todayYMD });
                     }
                 }
             } catch (e) {
@@ -2305,6 +2320,16 @@ function smV4PollEmails() {
     });
 }
 
+// Is one of today's pinned meetings owned by a Breakout/BM teacher? (A pinned
+// meeting counts as live — smAssignedHTML treats its owner as working now.)
+async function smV4AssignedBreakoutLive(ctx) {
+    for (const ow of (ctx.assignedOwnersToday || [])) {
+        const d = String(await getTeacherDepartment(ctx.client, ow) || '').toLowerCase();
+        if (d === 'bm' || d.includes('breakout')) return true;
+    }
+    return false;
+}
+
 // Is any of the learner's OWN breakout teachers (this slot's, the others in her
 // schedule, a breakout substitute) working right now with a joinable card?
 async function smV4OwnBreakoutLive(ctx, o) {
@@ -2419,7 +2444,12 @@ function smV4Strip(oldStrip, o) {
     const where = `Hãy vào tạm với <b>GV Breakout đang trực</b> bên dưới${o.count > 1 ? ' (chọn một trong ' + o.count + ' GV)' : ''}.`;
     const kind = (String(oldStrip || '').match(/sm-strip--([a-z]+)/) || [])[1] || '';
     if ((o.answered || kind === 'fallback') && oldStrip) {
-        return String(oldStrip).replace(/<\/span><\/div>$/, ` Muốn học ngay bây giờ? ${where}</span></div>`);
+        // a TTKB answer exists (pinned / substitute / main teacher), or her own breakout
+        // teacher has a room but is not live yet: keep that sentence, add the Breakout offer
+        const extra = (SM_V4.ROLE_BASED && !o.isAux && kind !== 'fallback')
+            ? `GV Breakout của bạn không làm việc lúc này — khi cần phòng Breakout, ${where.charAt(0).toLowerCase() + where.slice(1)}`
+            : `Muốn học ngay bây giờ? ${where}`;
+        return String(oldStrip).replace(/<\/span><\/div>$/, ` ${extra}</span></div>`);
     }
     if (o.relaxed) {
         return smStripHTML('info', `Hôm nay (<b>${wmEscape(o.DB_DAY_LABELS[o.todayDOW])} ${smDDMM(o.todayYMD)}</b>) bạn không có lịch học. Muốn học ngay bây giờ? ${where}`);
