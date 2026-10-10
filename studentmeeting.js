@@ -342,7 +342,7 @@ function setupRealtimeSubscriptions(studentEmail) {
             { event: '*', schema: 'public', table: 'meeting_links' },
             (payload) => {
                 const changed = (payload.new?.teacher_email || payload.old?.teacher_email || '').toLowerCase();
-                if (changed && myTeacherEmails.has(changed)) reloadScheduleDebounced();
+                if (changed && (myTeacherEmails.has(changed) || smV4OnDutyEmails.includes(changed))) reloadScheduleDebounced(); // sm-v4
             }
         );
 
@@ -351,7 +351,7 @@ function setupRealtimeSubscriptions(studentEmail) {
             { event: '*', schema: 'public', table: 'meeting_content' },
             (payload) => {
                 const changed = (payload.new?.teacher_email || payload.old?.teacher_email || '').toLowerCase();
-                if (changed && myTeacherEmails.has(changed)) reloadScheduleDebounced();
+                if (changed && (myTeacherEmails.has(changed) || smV4OnDutyEmails.includes(changed))) reloadScheduleDebounced(); // sm-v4
             }
         );
 
@@ -360,7 +360,7 @@ function setupRealtimeSubscriptions(studentEmail) {
             { event: '*', schema: 'public', table: 'meeting_offdays' },
             (payload) => {
                 const changed = (payload.new?.teacher_email || payload.old?.teacher_email || '').toLowerCase();
-                if (changed && myTeacherEmails.has(changed)) reloadScheduleDebounced();
+                if (changed && (myTeacherEmails.has(changed) || smV4OnDutyEmails.includes(changed))) reloadScheduleDebounced(); // sm-v4
             }
         );
 
@@ -1402,10 +1402,10 @@ function renderTiepHvMeetingCard(meeting, studentEmail, teacherName, teacherEmai
 
 // Smart poll: only fetch breakout room counts, reload page only if availability changed
 async function pollBreakoutRooms() {
-    if (!myBreakoutEmails.length) return; // no breakout teachers → nothing to poll
+    const pollEmails = smV4PollEmails(); if (!pollEmails.length) return; // sm-v4: own breakout teachers + the on-duty ones shown
     try {
         const allRoomNames = [];
-        for (const btEmail of myBreakoutEmails) {
+        for (const btEmail of pollEmails) { // sm-v4
             const rooms = await fetchAvailableBreakoutRooms(btEmail);
             for (const r of rooms) {
                 allRoomNames.push(r.room_name);
@@ -1590,6 +1590,16 @@ const SM_V3 = {
                                         // shift today (working now, or starting later). false = offer them
                                         // anyway when they have a room, with an honest note under the card.
 };
+// === tansinh sm-v4 config BEGIN (10 Oct 2026) — GV Breakout đang trực ===
+// When NONE of the learner's own teachers is working right now, the live day
+// also shows the Breakout/BM teachers who are on shift now, with their free
+// rooms. The code is in the sm-v4 block at the end of this file.
+const SM_V4 = {
+    ENABLED: true,      // one-word switch: false = the page behaves exactly as sm-v3
+    MAX_CHECK: 6,       // how many on-duty teachers to ask for free rooms (one API call each)
+    MAX_SHOW: 3         // how many of them to show, most free rooms first
+};
+// === tansinh sm-v4 config END ===
 
 // Next date (today or later) that falls on weekday dow (0=Sun..6=Sat)
 function smNextYMDForDow(dow, todayYMD) {
@@ -2056,6 +2066,45 @@ async function smRenderLiveDay(ctx, items, dbDay) {
             blocks.push(`<div class="sm-note"><i class="fa-solid fa-user-slash"></i> ${smWhyNot(mainSt, mainName, classTime, relaxed)}</div>`);
         }
 
+        // === tansinh sm-v4 hook BEGIN (10 Oct 2026) — GV Breakout đang trực ===
+        // Shown ONCE per day, at the first slot where nobody of the learner's OWN
+        // teachers (assigned meeting, substitute, main teacher, own breakout
+        // teachers) is working RIGHT NOW. Own teachers that start later today stay
+        // on screen; the on-duty teacher is added as the "right now" answer.
+        if (i === 0) smV4OnDutyEmails = [];
+        if (SM_V4.ENABLED && !ctx._smV4Shown && !ctx._smV4AnyLive) {
+            try {
+                const smV4SubSt = (sub && subCard && subCard.joinable)
+                    ? await statusOf(smLower(sub.substitute_teacher_email), sub.substitute_teacher_name || '', classTime, false)
+                    : null;
+                const smV4OwnLive = !!assignedHtml
+                    || !!(smV4SubSt && smV4SubSt.workingNow)
+                    || !!(mainCard && mainCard.joinable && mainSt && mainSt.workingNow)
+                    || await smV4OwnBreakoutLive(ctx, { item, breakoutEmails, brSub, mainEmail, isAux, classTime, statusOf, cardOf });
+                if (smV4OwnLive) {
+                    ctx._smV4AnyLive = true;
+                } else {
+                    const smV4Skip = new Set([mainEmail, ...breakoutEmails, ...usedBreakout,
+                        ...(ctx.assignedOwnersToday || []).map(smLower)].filter(Boolean));
+                    if (sub) smV4Skip.add(smLower(sub.substitute_teacher_email));
+                    if (brSub) smV4Skip.add(smLower(brSub.substitute_teacher_email));
+                    const od = await smV4OnDutySection(ctx, smV4Skip);
+                    if (od.count) {
+                        ctx._smV4Shown = true;
+                        smV4OnDutyEmails = od.emails;
+                        // the call-for-support badge is no longer the answer for this slot
+                        for (let k = blocks.length - 1; k >= 0; k--) {
+                            if (String(blocks[k]).indexOf('<div class="sm-call') === 0) blocks.splice(k, 1);
+                        }
+                        blocks.push(od.html);
+                        strip = smV4Strip(strip, { answered, relaxed, mainSt, mainName, classTime, count: od.count, DB_DAY_LABELS, todayDOW, todayYMD });
+                    }
+                }
+            } catch (e) {
+                console.error('[sm-v4] on-duty block error', e);
+            }
+        }
+        // === tansinh sm-v4 hook END ===
         if (!strip) strip = smStripHTML('info', `Hãy chọn một meeting bên dưới để vào lớp.`);
         slotBlocks.push({ item, strip, blocks: blocks.join('') });
     }
@@ -2235,3 +2284,151 @@ async function renderScheduleRowsV2(ctx) {
     return html;
 }
 // === tansinh sm-v3 END ===
+// === tansinh sm-v4 BEGIN (10 Oct 2026) — GV Breakout đang trực ===
+// The fallback the sm-v3 rewrite lost: when nobody of the learner's own teachers
+// is working right now, show the Breakout/BM teachers who are on shift now.
+// Reuses fetchFallbackTeachersNow (shift covers now, not off today),
+// fetchAvailableBreakoutRooms, fetchTiepHvMeeting, renderBreakoutRoomChips,
+// renderTiepHvMeetingCard, smFillNames, smSectionHTML and smStripHTML.
+// Config: SM_V4, next to SM_V3. Switch off with SM_V4.ENABLED = false.
+
+// emails of the on-duty teachers shown in the last render; the 30-second room
+// poll and the realtime handlers watch them too (see pollBreakoutRooms)
+let smV4OnDutyEmails = [];
+
+function smV4PollEmails() {
+    const seen = new Set();
+    return [...myBreakoutEmails, ...smV4OnDutyEmails].map(smLower).filter(e => {
+        if (!e || seen.has(e)) return false;
+        seen.add(e);
+        return true;
+    });
+}
+
+// Is any of the learner's OWN breakout teachers (this slot's, the others in her
+// schedule, a breakout substitute) working right now with a joinable card?
+async function smV4OwnBreakoutLive(ctx, o) {
+    const { nameByTeacher } = ctx;
+    const own = [smLower(o.item.breakout_email), ...o.breakoutEmails]
+        .filter((e, i, a) => e && a.indexOf(e) === i && e !== o.mainEmail);
+    const cands = own.map(be => ({ em: be, name: (nameByTeacher[be] || '').trim() || be, label: 'Breakout' }));
+    if (o.brSub && !o.isAux) {
+        const se = smLower(o.brSub.substitute_teacher_email);
+        if (se && !cands.some(c => c.em === se)) {
+            cands.push({ em: se, name: o.brSub.substitute_teacher_name || nameByTeacher[se] || se, label: 'Breakout dạy thay' });
+        }
+    }
+    for (const c of cands) {
+        const st = await o.statusOf(c.em, c.name, o.classTime, false);
+        if (!smAvailable(st) || !st.workingNow) continue;
+        const card = await o.cardOf(c.em, c.name, 'breakout', st, c.label);
+        if (card.joinable) return true;
+    }
+    return false;
+}
+
+// The shift that covers "now" for this teacher today (same date rules as
+// getTeacherUpcomingShiftsToday, same 20-minute tail as fetchFallbackTeachersNow).
+async function smV4ShiftNow(client, teacherEmail, todayDOW) {
+    const em = smLower(teacherEmail);
+    if (!em) return null;
+    try {
+        const { data } = await client.from('meeting_content')
+            .select('start_time, end_time, work_date, is_one_time')
+            .ilike('teacher_email', em);
+        const now = new Date();
+        const nowMin = now.getHours() * 60 + now.getMinutes();
+        const todayYMD = thisWeekYMDForDow(Number(todayDOW));
+        for (const r of (data || [])) {
+            const isOne = r.is_one_time === true || r.is_one_time === 1 ||
+                String(r.is_one_time).toLowerCase() === 'true' || String(r.is_one_time).toLowerCase() === 't';
+            const rowYMD = String(r.work_date).slice(0, 10);
+            const dateOk = isOne ? (rowYMD === todayYMD) : (weekdayFromYMD(r.work_date) === Number(todayDOW));
+            if (!dateOk) continue;
+            const s = toMinutes(r.start_time);
+            const e = toMinutes(r.end_time);
+            if (nowMin >= s && nowMin < Math.min(e + 20, 24 * 60)) return { start: timeHHMM(r.start_time), end: timeHHMM(r.end_time) };
+        }
+    } catch (e) {
+        console.error('[sm-v4] shift lookup error', e);
+    }
+    return null;
+}
+
+// "đang làm việc" -> "đang trực · ca 08:00–12:00" on a card we did not write
+function smV4Decorate(cardHtml, shift) {
+    const tail = shift ? ` <span class="sm-onduty__shift"><i class="fa-regular fa-clock"></i> ca ${wmEscape(shift.start)}–${wmEscape(shift.end)}</span>` : '';
+    return String(cardHtml).replace('GV Breakout — đang làm việc', 'GV Breakout — đang trực' + tail);
+}
+
+// The section: on-duty Breakout/BM teachers with free rooms (most rooms first);
+// if nobody has a free room, their main meeting with an honest note.
+// Returns { count, html, emails }.
+async function smV4OnDutySection(ctx, skip) {
+    const { client, nameByTeacher, studentEmail, todayDOW } = ctx;
+    const out = { count: 0, html: '', emails: [] };
+    const list = await fetchFallbackTeachersNow(client, ['breakout', 'bm']);
+    const cands = [];
+    for (const t of (list || [])) {
+        const em = smLower(t.teacher_email);
+        if (!em || skip.has(em) || cands.some(c => c.em === em)) continue;
+        cands.push({ em, name: (t.teacher_name || '').trim() });
+        if (cands.length >= SM_V4.MAX_CHECK) break;
+    }
+    if (!cands.length) return out;
+    await smFillNames(client, nameByTeacher, cands.map(c => c.em));
+    const withRooms = [];
+    const noRooms = [];
+    for (const c of cands) {
+        c.name = (nameByTeacher[c.em] || '').trim() || c.name || c.em;
+        c.rooms = await fetchAvailableBreakoutRooms(c.em);
+        (c.rooms.length ? withRooms : noRooms).push(c);
+    }
+    withRooms.sort((a, b) => b.rooms.length - a.rooms.length);
+    const picked = withRooms.slice(0, SM_V4.MAX_SHOW);
+    const cards = [];
+    for (const c of picked) {
+        const shift = await smV4ShiftNow(client, c.em, todayDOW);
+        cards.push(smV4Decorate(renderBreakoutRoomChips(c.rooms, studentEmail, c.name, c.em, false, []), shift));
+    }
+    if (!cards.length) {
+        for (const c of noRooms.slice(0, SM_V4.MAX_SHOW)) {
+            const m = await fetchTiepHvMeeting(c.em);
+            if (!m || !m.room_name) continue;
+            const shift = await smV4ShiftNow(client, c.em, todayDOW);
+            cards.push(smV4Decorate(renderTiepHvMeetingCard(m, studentEmail, c.name, c.em, false, [], 'Breakout'), shift)
+                + `<div class="sm-onduty__note"><i class="fa-solid fa-circle-info"></i> Phòng Breakout của GV này đang kín. Vào <b>Meeting chính</b> và chờ GV mời bạn vào phòng.</div>`);
+            picked.push(c);
+        }
+    }
+    if (!cards.length) return out;
+    out.count = cards.length;
+    out.emails = picked.map(c => c.em);
+    out.html = smSectionHTML('onduty', `<i class="fa-solid fa-door-open"></i> GV Breakout đang trực lúc này`,
+        cards.join('')
+        + `<div class="sm-onduty__note"><i class="fa-solid fa-circle-info"></i> Đây không phải GV Breakout thường ngày của bạn — hôm nay bạn vào tạm. Nếu vào phòng mà không có ai, bấm <b>Gọi hỗ trợ</b> ở đầu trang.</div>`);
+    return out;
+}
+
+// The one-line explanation above the card. Three situations:
+//   someone of hers answers later today (or her own breakout teacher has a
+//   room but is not live yet)  -> keep that sentence, add the offer
+//   no class today             -> calm info line
+//   nobody of hers can take her -> why, then the offer (or "class is over")
+function smV4Strip(oldStrip, o) {
+    const where = `Hãy vào tạm với <b>GV Breakout đang trực</b> bên dưới${o.count > 1 ? ' (chọn một trong ' + o.count + ' GV)' : ''}.`;
+    const kind = (String(oldStrip || '').match(/sm-strip--([a-z]+)/) || [])[1] || '';
+    if ((o.answered || kind === 'fallback') && oldStrip) {
+        return String(oldStrip).replace(/<\/span><\/div>$/, ` Muốn học ngay bây giờ? ${where}</span></div>`);
+    }
+    if (o.relaxed) {
+        return smStripHTML('info', `Hôm nay (<b>${wmEscape(o.DB_DAY_LABELS[o.todayDOW])} ${smDDMM(o.todayYMD)}</b>) bạn không có lịch học. Muốn học ngay bây giờ? ${where}`);
+    }
+    const why = smWhyNot(o.mainSt, o.mainName, o.classTime, o.relaxed);
+    const d = new Date();
+    const nowMin = d.getHours() * 60 + d.getMinutes();
+    const classOver = (nowMin - toMinutes(o.classTime)) >= 120 || !!(o.mainSt && o.mainSt.ended && !o.mainSt.off);
+    if (classOver) return smStripHTML('off', `${why} Buổi học lúc <b>${wmEscape(o.classTime)}</b> hôm nay đã qua giờ. Muốn học thêm? ${where}`);
+    return smStripHTML('fallback', `${why} GV Breakout của bạn cũng không làm việc lúc này. ${where}`);
+}
+// === tansinh sm-v4 END ===

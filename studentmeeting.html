@@ -7,10 +7,10 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <title>Student Meeting</title>
-  <link rel="stylesheet" href="style.css?v=20261010_sb1" />
+  <link rel="stylesheet" href="style.css?v=20261010_1526_sb1" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.4/dist/umd/supabase.js" defer></script>
- <script src="studentmeeting.js?v=20261010_smv3" defer></script>
+ <script src="studentmeeting.js?v=20261010_1526_smv4" defer></script>
 <script>window.addEventListener('pageshow', function(e) { if (e.persisted) location.reload(); });</script>
 
 
@@ -486,12 +486,21 @@
 }
 
 /* === tansinh sm-v3 END === */
+/* === tansinh sm-v4 BEGIN (10 Oct 2026) — GV Breakout đang trực === */
+.sm-section--onduty .sm-section__label { color: #0f766e; }
+#studentMeetingRoot .sm-section--onduty .tmc-card { border-color: #a7f3d0; background: #fff; }
+#studentMeetingRoot .sm-section--onduty .tmc-card:hover { border-color: #5eead4; }
+#studentMeetingRoot .sm-section--onduty .tmc-avatar { background: linear-gradient(135deg, #10b981, #0f766e); }
+.sm-onduty__shift { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; font-size: 11.5px; font-weight: 700; color: #0f766e; white-space: nowrap; }
+.sm-onduty__note { margin: 8px 2px 0; font-size: 12px; color: #64748b; display: flex; gap: 6px; align-items: flex-start; line-height: 1.45; }
+.sm-onduty__note i { margin-top: 2px; flex-shrink: 0; }
+/* === tansinh sm-v4 END === */
 
 </style>
 
 </head>
 <body>
-  <script src="sidebar.js?v=20261010_sb1"></script><!-- tansinh sb-v1: the shared sidebar. Keep this line right after <body>. -->
+  <script src="sidebar.js?v=20261010_1526_sb1"></script><!-- tansinh sb-v1: the shared sidebar. Keep this line right after <body>. -->
   <!-- ---------- Login Card (same layout as index.html) ---------- -->
   <div class="card" id="loginCard">
     <div class="logo">Meetings</div>
