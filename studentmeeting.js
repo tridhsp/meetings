@@ -1591,7 +1591,10 @@ window.addEventListener('beforeunload', () => {
 const SM_V2 = {
     SUPPORT_URL: 'https://ringts.tansinh.info/',
     SHOW_PLANNED_ON_OTHER_DAYS: true,   // one-word switch: names + notes on days that are not today
-    SHOW_DATE_UNDER_DAY: true           // dd/mm under the day name
+    SHOW_DATE_UNDER_DAY: true,          // dd/mm under the day name
+    FALLBACK_NEEDS_SHIFT: true          // a breakout teacher is offered as the fallback ONLY if they have a
+                                        // shift today (working now, or starting later). false = offer them
+                                        // anyway when they have a room, with an honest note under the card.
 };
 
 // Next date (today or later) that falls on weekday dow (0=Sun..6=Sat)
@@ -1742,7 +1745,12 @@ async function smTeacherStatusToday(ctx, emailKey, displayName, classTime, stric
     }
     st.workingNow = await isTeacherWorkingAt(client, emailKey, displayName, todayDOW, smNowHHMM());
     if (!st.workingNow) st.upcoming = await getTeacherUpcomingShiftsToday(client, emailKey, displayName, todayDOW);
-    st.ended = st.slotOk && !st.workingNow && st.upcoming.length === 0;
+    // "any shift at all today?" — only asked when nothing is live or upcoming
+    st.anyToday = (st.workingNow || st.upcoming.length > 0)
+        ? true
+        : await isTeacherWorkingAt(client, emailKey, displayName, todayDOW, '00:00', 24 * 60);
+    st.noShift = !st.anyToday;                                           // no shift today at all
+    st.ended = st.anyToday && !st.workingNow && st.upcoming.length === 0; // worked today, done now
     return st;
 }
 
@@ -1755,9 +1763,19 @@ function smWhyNot(st, name, classTime, relaxed) {
     const who = `GV phụ trách <b>${wmEscape(name)}</b>`;
     if (!st) return `Buổi này <b>chưa có GV phụ trách</b>.`;
     if (st.off) return `${who} <b>nghỉ hôm nay</b>.`;
+    if (st.noShift) return `${who} <b>chưa có lịch làm việc hôm nay</b>.`;
     if (!st.slotOk && !relaxed) return `${who} không có lịch làm việc vào giờ học của bạn (<b>${wmEscape(classTime)}</b>).`;
     if (st.ended) return `Ca làm việc hôm nay của ${who} <b>đã kết thúc</b>.`;
     return `${who} hiện không làm việc.`;
+}
+
+// Short reason for a grey card
+function smShortWhy(st, classTime, relaxed) {
+    if (st.off) return '<strong>nghỉ hôm nay</strong>';
+    if (st.noShift) return 'chưa có lịch làm việc hôm nay';
+    if (!st.slotOk && !relaxed) return `không có lịch vào ${wmEscape(classTime)}`;
+    if (st.ended) return 'ca hôm nay đã kết thúc';
+    return 'hiện không làm việc';
 }
 
 // Build the join card for ONE teacher. Returns { html, joinable }.
@@ -1934,10 +1952,7 @@ async function smRenderLiveDay(ctx, items, dbDay) {
 
             // if the main teacher exists but is off / unscheduled, say so with a card
             if (mainEmail && mainSt && !mainCard) {
-                const note = mainSt.off ? '<strong>nghỉ hôm nay</strong>'
-                    : (!mainSt.slotOk && !relaxed) ? `không có lịch vào ${wmEscape(classTime)}`
-                    : (mainSt.ended ? 'ca hôm nay đã kết thúc' : 'hiện không làm việc');
-                if (!relaxed) blocks.push(smOffCardHTML(mainName, mainEmail, roleLabel, note, mainSt.off ? 'off' : 'noroom'));
+                if (!relaxed) blocks.push(smOffCardHTML(mainName, mainEmail, roleLabel, smShortWhy(mainSt, classTime, relaxed), mainSt.off ? 'off' : 'noroom'));
             }
 
             // candidates: this slot's own breakout teacher first, then the learner's other
@@ -1961,8 +1976,23 @@ async function smRenderLiveDay(ctx, items, dbDay) {
             const badCards = [];
             for (const c of cands) {
                 const st = await statusOf(c.em, c.name, classTime, false);
-                const card = await cardOf(c.em, c.name, 'breakout', st, c.label);
                 usedBreakout.add(c.em);
+                if (!smAvailable(st)) {
+                    // no shift today / already done / off
+                    if (st.off || SM_V2.FALLBACK_NEEDS_SHIFT) {
+                        badCards.push(smOffCardHTML(c.name, c.em, c.label, smShortWhy(st, classTime, relaxed), st.off ? 'off' : 'noroom'));
+                        continue;
+                    }
+                    // switch is off: offer the room anyway, but say what we know
+                    const card = await cardOf(c.em, c.name, 'breakout', st, c.label);
+                    if (card.joinable) {
+                        goodCards.push(card.html + `<div class="sm-note"><i class="fa-solid fa-circle-info"></i> GV này ${smShortWhy(st, classTime, relaxed)} — hãy thử vào phòng; nếu không có ai, gọi hỗ trợ.</div>`);
+                    } else {
+                        badCards.push(card.html);
+                    }
+                    continue;
+                }
+                const card = await cardOf(c.em, c.name, 'breakout', st, c.label);
                 if (card.joinable) goodCards.push(card.html); else badCards.push(card.html);
             }
 
@@ -1973,9 +2003,15 @@ async function smRenderLiveDay(ctx, items, dbDay) {
                     : smStripHTML('fallback', `${why} Hãy vào lớp với <b>GV Breakout</b> bên dưới${goodCards.length > 1 ? ' (chọn một trong ' + goodCards.length + ' GV)' : ''}.`);
             } else {
                 if (badCards.length) blocks.push(smSectionHTML('fallback', `<i class="fa-solid fa-people-arrows"></i> GV Breakout của bạn`, badCards.join('')));
+                const nowMinSm = (() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); })();
+                const classOver = (nowMinSm - toMinutes(classTime)) >= 120 || !!(mainSt && mainSt.ended && !mainSt.off);
                 if (relaxed) {
                     strip = smStripHTML('info', `${why} Không có GV nào của bạn đang làm việc lúc này.`);
                     blocks.push(smCallBadgeHTML(`Cần hỗ trợ hoặc muốn học bù? Hãy gọi cho chúng tôi.`, true));
+                } else if (classOver) {
+                    // the lesson is behind us: calm, not an alarm
+                    strip = smStripHTML('off', `${why} Buổi học lúc <b>${wmEscape(classTime)}</b> hôm nay đã qua giờ.`);
+                    blocks.push(smCallBadgeHTML(`Buổi học hôm nay đã qua giờ. Cần hỗ trợ hoặc muốn học bù? Hãy gọi cho chúng tôi.`, true));
                 } else {
                     strip = smStripHTML('call', `${why} Không có GV Breakout nào có thể nhận bạn lúc này — hãy <b>gọi hỗ trợ</b>.`);
                     blocks.push(smCallBadgeHTML(`Chưa có giáo viên nào cho buổi học <b>${wmEscape(classTime)}</b> của bạn.`, false));
@@ -1999,8 +2035,10 @@ async function smRenderLiveDay(ctx, items, dbDay) {
         const name = (nameByTeacher[be] || '').trim() || be;
         const refTime = timeHHMM((items.find(r => smLower(r.breakout_email) === be) || {}).time_local || '00:00');
         const st = await statusOf(be, name, refTime, false);
-        if (st.off) { breakoutLive.push(smOffCardHTML(name, be, 'Breakout', '<strong>nghỉ hôm nay</strong>', 'off')); continue; }
-        if (!st.workingNow && !st.upcoming.length) continue;          // not today: show nothing
+        if (!smAvailable(st)) {                                         // off, no shift today, or done
+            breakoutLive.push(smOffCardHTML(name, be, 'Breakout', smShortWhy(st, refTime, true), st.off ? 'off' : 'noroom'));
+            continue;
+        }
         const card = await cardOf(be, name, 'breakout', st, 'Breakout');
         (st.workingNow ? breakoutLive : breakoutSoon).push(card.html);
     }
