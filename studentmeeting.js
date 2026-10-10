@@ -2616,9 +2616,9 @@ async function smV5Resolve(ctx, items, dbDay, noClass) {
             if (smAvailable(st)) {
                 const t = await smV5Teacher(ctx, em, nameOf(em), 'ttkb', st);
                 if (t.joinable) { main.kind = 'own'; main.t = t; main.time = ct; main.notYet = !st.workingNow; break; }
-                if (!main.why) { main.why = `GV của bạn, ${t.name}, đang làm việc nhưng chưa có phòng meeting`; main.t = t; }
+                if (!main.why) { main.why = `GV TTKB của bạn, ${t.name}, đang làm việc nhưng chưa có phòng meeting`; main.t = t; }
             } else if (!main.why) {
-                main.why = `GV của bạn, ${nameOf(em)}, ${smV5Why(st, ct, true)}`;
+                main.why = `GV TTKB của bạn, ${nameOf(em)}, ${smV5Why(st, ct, true)}`;
                 main.t = { email: em, name: nameOf(em), st, kind: 'ttkb', rooms: [], mainUrl: '', joinable: false };
             }
         }
@@ -2727,20 +2727,23 @@ async function smV5Resolve(ctx, items, dbDay, noClass) {
 function smV5Headline(R) {
     const mName = R.main.t ? wmEscape(R.main.t.name) : '';
     const bName = R.br.t ? wmEscape(R.br.t.name) : '';
-    const brPart = R.brOk ? (R.br.notYet ? ' Phòng Breakout mở lúc <b>' + wmEscape(R.br.t.st.upcoming[0] ? R.br.t.st.upcoming[0].start : '') + '</b>.' : ' Cần phòng Breakout thì sang ô bên cạnh.') : '';
-    if (R.main.kind === 'pinned') return ['assigned', `Hôm nay bạn được <b>xếp vào lớp</b> của GV <b>${mName}</b>. Vào <b>Lớp chính</b> trước.${brPart}`];
+    const brAt = R.brOk && R.br.notYet ? wmEscape(R.br.t.st.upcoming[0] ? R.br.t.st.upcoming[0].start : '') : '';
+    const brPart = !R.brOk ? ''
+        : R.br.notYet ? ` GV Breakout <b>${bName}</b> bắt đầu lúc <b>${brAt}</b>.`
+        : ` GV Breakout <b>${bName}</b> điểm danh và theo dõi bạn ở ô bên cạnh.`;
+    if (R.main.kind === 'pinned') return ['assigned', `Hôm nay bạn được <b>xếp vào meeting TTKB</b> của GV <b>${mName}</b> — vào để tương tác.${brPart}`];
     if (R.relaxed) {
-        if (R.mainOk || R.brOk) return ['info', `Hôm nay bạn <b>không có lịch học</b>. Muốn học thêm? Vào với GV đang trực bên dưới.`];
+        if (R.mainOk || R.brOk) return ['info', `Hôm nay bạn <b>không có lịch học</b>. Muốn học thêm? Vào meeting Breakout với GV đang trực.`];
         return ['info', `Hôm nay bạn <b>không có lịch học</b>. Lúc này không có GV nào trực.`];
     }
-    if (R.main.kind === 'sub' && R.mainOk) return ['sub', `Hôm nay GV <b>${mName}</b> dạy thay. Vào <b>Lớp chính</b>${R.main.notYet ? ' đúng giờ' : ''}.${brPart}`];
+    if (R.main.kind === 'sub' && R.mainOk) return ['sub', `Hôm nay GV <b>${mName}</b> dạy thay — vào meeting TTKB${R.main.notYet ? ' đúng giờ' : ''} để tương tác.${brPart}`];
     if (R.mainOk && R.main.notYet) {
         const at = R.main.t.st.upcoming[0] ? R.main.t.st.upcoming[0].start : R.main.time;
-        return ['soon', `GV của bạn bắt đầu lúc <b>${wmEscape(at)}</b>. Vào lớp đúng giờ.${R.brOk && !R.br.notYet ? ' Muốn học ngay bây giờ? Vào <b>Phòng Breakout</b> bên cạnh.' : brPart}`];
+        return ['soon', `GV TTKB của bạn bắt đầu lúc <b>${wmEscape(at)}</b>.${R.brOk && !R.br.notYet ? ' Muốn học ngay bây giờ? Vào meeting Breakout để GV điểm danh.' : brPart}`];
     }
-    if (R.mainOk) return ['ok', `GV của bạn <b>đang dạy</b>. Bấm <b>Vào lớp</b>.${brPart}`];
-    const why = R.main.why ? wmEscape(R.main.why) + '.' : 'Hôm nay chưa có GV lớp chính.';
-    if (R.brOk) return ['fallback', `${why} Hôm nay bạn vào <b>phòng Breakout</b> với GV <b>${bName}</b>${R.br.notYet ? ' lúc <b>' + wmEscape(R.br.t.st.upcoming[0] ? R.br.t.st.upcoming[0].start : '') + '</b>' : ''}.`];
+    if (R.mainOk) return ['ok', `GV TTKB của bạn <b>đang dạy</b> — vào meeting TTKB để tương tác.${brPart}`];
+    const why = R.main.why ? wmEscape(R.main.why) + '.' : 'Hôm nay chưa có GV TTKB cho bạn.';
+    if (R.brOk) return ['fallback', `${why} Hôm nay GV Breakout <b>${bName}</b> điểm danh và theo dõi bạn — vào ô <b>Meeting Breakout</b>${R.br.notYet ? ' lúc <b>' + brAt + '</b>' : ''}.`];
     if (R.classOver) return ['off', `Buổi học lúc <b>${wmEscape(R.classTime)}</b> hôm nay đã qua giờ. Cần hỗ trợ hoặc muốn học bù? Gọi cho chúng tôi.`];
     return ['call', `${why} Lúc này <b>chưa có GV nào</b> cho bạn — bấm <b>Gọi hỗ trợ</b>.`];
 }
@@ -2751,27 +2754,27 @@ function smV5Avatar(t) {
 
 function smV5MainTile(R) {
     const o = R.main;
-    const time = o.time ? ` · ${wmEscape(o.time)}` : '';
-    const label = `<div class="v5-tile__label"><i class="fa-solid fa-chalkboard-user"></i> Lớp chính${time}</div>`;
+    const time = o.time ? `Buổi học ${wmEscape(o.time)} · ` : '';
+    const label = `<div class="v5-tile__label"><i class="fa-solid fa-chalkboard-user"></i> Meeting TTKB <span class="v5-tile__label-sub">· tương tác với GV</span></div>`;
     if (!R.mainOk) {
         const who = o.t
-            ? `<div class="v5-tile__who">${smV5Avatar(o.t)}<div class="v5-tile__txt"><div class="v5-tile__name">${wmEscape(o.t.name)}</div><div class="v5-tile__sub">${wmEscape(o.why || 'hiện không làm việc')}</div></div></div>`
-            : `<div class="v5-tile__sub">${R.relaxed ? 'Hôm nay bạn không có lớp chính.' : wmEscape(o.why || 'Hôm nay chưa có GV lớp chính.')}</div>`;
-        const note = R.brOk ? `<div class="v5-tile__note"><i class="fa-solid fa-arrow-right"></i> Hôm nay bạn học ở ô <b>Phòng Breakout</b>.</div>` : '';
+            ? `<div class="v5-tile__who">${smV5Avatar(o.t)}<div class="v5-tile__txt"><div class="v5-tile__name">${wmEscape(o.t.name)}</div><div class="v5-tile__sub">${time}${wmEscape(o.why || 'hiện không làm việc')}</div></div></div>`
+            : `<div class="v5-tile__sub">${R.relaxed ? 'Hôm nay bạn không có meeting TTKB.' : wmEscape(o.why || 'Hôm nay chưa có GV TTKB cho bạn.')}</div>`;
+        const note = R.brOk ? `<div class="v5-tile__note"><i class="fa-solid fa-arrow-right"></i> Hôm nay bạn học ở ô <b>Meeting Breakout</b>.</div>` : '';
         return `<div class="v5-tile v5-tile--main v5-tile--muted">${label}${who}${note}</div>`;
     }
-    const sub = o.kind === 'pinned' ? 'Hôm nay bạn được xếp vào lớp này'
-        : o.kind === 'sub' ? 'GV dạy thay hôm nay' + (o.notYet ? ' · bắt đầu lúc ' + wmEscape(o.t.st.upcoming[0] ? o.t.st.upcoming[0].start : '') : '')
-        : o.notYet ? 'GV của bạn · bắt đầu lúc ' + wmEscape(o.t.st.upcoming[0] ? o.t.st.upcoming[0].start : '')
-        : 'GV của bạn · đang dạy';
-    const btn = `<a class="v5-btn v5-btn--main${o.notYet ? ' v5-btn--soon' : ''}" href="${wmEscape(o.t.mainUrl)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-video"></i> Vào lớp${o.notYet ? ' (chưa tới giờ)' : ''}</a>`;
+    const sub = o.kind === 'pinned' ? 'Hôm nay bạn được xếp vào meeting này'
+        : o.kind === 'sub' ? time + 'GV dạy thay hôm nay' + (o.notYet ? ' · bắt đầu lúc ' + wmEscape(o.t.st.upcoming[0] ? o.t.st.upcoming[0].start : '') : '')
+        : o.notYet ? time + 'GV TTKB của bạn · bắt đầu lúc ' + wmEscape(o.t.st.upcoming[0] ? o.t.st.upcoming[0].start : '')
+        : time + 'GV TTKB của bạn · đang dạy';
+    const btn = `<div class="v5-row"><a class="v5-btn v5-btn--main${o.notYet ? ' v5-btn--soon' : ''}" href="${wmEscape(o.t.mainUrl)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-video"></i> Vào meeting TTKB${o.notYet ? ' (chưa tới giờ)' : ''}</a></div>`;
     return `<div class="v5-tile v5-tile--main">${label}<div class="v5-tile__who">${smV5Avatar(o.t)}<div class="v5-tile__txt"><div class="v5-tile__name">${wmEscape(o.t.name)}</div><div class="v5-tile__sub">${sub}</div></div></div>${btn}</div>`;
 }
 
 function smV5BreakoutTile(R) {
     const o = R.br;
-    const time = o.time ? ` · ${wmEscape(o.time)}` : '';
-    const label = `<div class="v5-tile__label"><i class="fa-solid fa-door-open"></i> Phòng Breakout${time}</div>`;
+    const time = o.time ? `Buổi phụ ${wmEscape(o.time)} · ` : '';
+    const label = `<div class="v5-tile__label"><i class="fa-solid fa-door-open"></i> Meeting Breakout <span class="v5-tile__label-sub">· GV điểm danh và theo dõi bạn</span></div>`;
     if (!R.brOk) {
         const who = o.why
             ? `<div class="v5-tile__sub">${wmEscape(o.why)}.</div>`
@@ -2789,19 +2792,19 @@ function smV5BreakoutTile(R) {
     } else if (o.kind === 'sub') {
         sub = 'GV Breakout dạy thay hôm nay' + (o.notYet ? ' · bắt đầu lúc ' + wmEscape(t.st.upcoming[0] ? t.st.upcoming[0].start : '') : '');
     } else if (R.main.t && R.mainOk && R.main.t.email === t.email) {
-        sub = 'Cũng là GV lớp chính của bạn · phòng Breakout trong lớp này';
+        sub = time + 'Cũng là GV TTKB của bạn · phòng Breakout trong meeting này';
     } else {
-        sub = o.notYet ? 'GV Breakout của bạn · bắt đầu lúc ' + wmEscape(t.st.upcoming[0] ? t.st.upcoming[0].start : '') : 'GV Breakout của bạn · đang trực';
+        sub = time + (o.notYet ? 'GV Breakout của bạn · bắt đầu lúc ' + wmEscape(t.st.upcoming[0] ? t.st.upcoming[0].start : '') : 'GV Breakout của bạn · đang trực');
     }
     const step1 = t.mainUrl
-        ? `<div class="v5-step"><span class="v5-step__n">1</span><a class="v5-btn v5-btn--breakout${o.notYet ? ' v5-btn--soon' : ''}" href="${wmEscape(t.mainUrl)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-headset"></i> Vào Meeting chính để điểm danh</a></div>`
+        ? `<div class="v5-step"><span class="v5-step__n">1</span><div class="v5-row"><a class="v5-btn v5-btn--breakout${o.notYet ? ' v5-btn--soon' : ''}" href="${wmEscape(t.mainUrl)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-headset"></i> Vào meeting của GV Breakout</a><span class="v5-row__hint">GV điểm danh bạn ở đây</span></div></div>`
         : '';
     const chips = t.rooms.map(r => `<a class="tmc-room-btn" href="${wmEscape(r.url)}" target="_blank" rel="noopener noreferrer" title="${wmEscape(r.room_name)}">${wmEscape(r.num)}</a>`).join('');
     const step2 = t.rooms.length
-        ? `<div class="v5-step"><span class="v5-step__n">2</span><div class="v5-step__txt">Sau khi điểm danh, chọn một phòng trống (${t.rooms.length}):<div class="v5-rooms">${chips}</div></div></div>`
+        ? `<div class="v5-step"><span class="v5-step__n">2</span><div class="v5-step__txt">Rồi vào một phòng Breakout trống (${t.rooms.length}):<div class="v5-rooms">${chips}</div></div></div>`
         : (o.notYet
             ? `<div class="v5-step"><span class="v5-step__n">2</span><div class="v5-step__txt">Phòng Breakout sẽ mở khi GV bắt đầu lúc <b>${wmEscape(t.st.upcoming[0] ? t.st.upcoming[0].start : '')}</b>.</div></div>`
-            : `<div class="v5-step"><span class="v5-step__n">2</span><div class="v5-step__txt">Phòng Breakout đang kín — ở lại Meeting chính, GV sẽ mời bạn vào phòng.</div></div>`);
+            : `<div class="v5-step"><span class="v5-step__n">2</span><div class="v5-step__txt">Phòng Breakout đang kín — ở lại meeting của GV, GV sẽ mời bạn vào phòng.</div></div>`);
     const note = o.notYet ? `<div class="v5-tile__note"><i class="fa-regular fa-clock"></i> Chưa tới giờ — vào đúng giờ GV bắt đầu.</div>` : '';
     const others = (o.others || []).length
         ? `<div class="v5-tile__note"><i class="fa-solid fa-people-arrows"></i> Cũng đang trực: ${o.others.map(x => wmEscape(x.name)).join(', ')}.</div>`
@@ -2818,9 +2821,9 @@ async function smV5TodayBody(ctx, items, dbDay, noClass) {
         const tiles = `<div class="v5-tiles">${smV5MainTile(R)}${smV5BreakoutTile(R)}</div>`;
         const h = R.help[0];
         const helpLeft = h
-            ? `<i class="fa-solid fa-headset"></i> Cần giúp? ${wmEscape(h.label)} <b>${wmEscape(h.name)}</b> đang trực${h.url ? ` · <a href="${wmEscape(h.url)}" target="_blank" rel="noopener noreferrer">Vào</a>` : ''}`
-            : `<i class="fa-solid fa-headset"></i> Cần giúp? Gọi cho chúng tôi.`;
-        const helpBar = `<div class="v5-help"><span>${helpLeft}</span><a class="v5-help__call" href="${wmEscape(SM_V3.SUPPORT_URL)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-phone-volume"></i> Gọi hỗ trợ</a></div>`;
+            ? `<span><i class="fa-solid fa-headset"></i> Cần giúp? ${wmEscape(h.label)} <b>${wmEscape(h.name)}</b> đang trực</span>${h.url ? `<a class="v5-help__btn" href="${wmEscape(h.url)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-comments"></i> Vào gặp ${wmEscape(h.label)}</a>` : ''}`
+            : `<span><i class="fa-solid fa-headset"></i> Cần giúp? Gọi cho chúng tôi.</span>`;
+        const helpBar = `<div class="v5-help"><span class="v5-help__left">${helpLeft}</span><a class="v5-help__call" href="${wmEscape(SM_V3.SUPPORT_URL)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-phone-volume"></i> Gọi hỗ trợ</a></div>`;
         const badge = (!R.mainOk && !R.brOk)
             ? smCallBadgeHTML(R.relaxed ? 'Cần hỗ trợ hoặc muốn học bù? Hãy gọi cho chúng tôi.' : (R.classOver ? 'Buổi học hôm nay đã qua giờ. Cần hỗ trợ hoặc muốn học bù? Hãy gọi cho chúng tôi.' : `Chưa có giáo viên nào cho buổi học <b>${wmEscape(R.classTime)}</b> của bạn.`), R.relaxed || R.classOver)
             : '';
