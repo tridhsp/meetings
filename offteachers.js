@@ -91,10 +91,7 @@ async function showApp() {
   const main = document.getElementById('mainContent');
   if (main) main.style.display = 'block';
 
-  await loadOffTeachers();
-  await loadExistingSubstitutes();
-  await loadUnmatchedStudents();
-  await loadUpcomingImpacted();
+  await loadQueue();   // tansinh offq v1: one loader, one list
 }
 
 function setupPasswordToggle() {
@@ -175,667 +172,513 @@ const dayLabels = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
 // ========== LOAD DATA ==========
 
-async function loadOffTeachers() {
-  const content = document.getElementById('otContent');
+// ========== OFF-TEACHER WORK QUEUE v1 (10 Oct 2026) ==========
+// One data layer and one renderer. These replace loadOffTeachers/buildSection,
+// loadUnmatchedStudents and loadUpcomingImpacted — three columns that told the
+// same story three times. Everything below reads OQ and redraws from it.
+//
+//   OQ.items    every uncovered student session we know about: this week
+//               (unmatched-students, keyed by weekday -> real dates) plus
+//               tomorrow .. +14 days (upcoming-impacted-students, by date).
+//               Where the two overlap, the date-exact row wins.
+//   OQ.offRows  meeting_offdays from -8 weeks to +3 weeks: the "cause" lines
+//               and the archive.
+//   existingSubstitutes  (below) now covers the SAME range, so a past day
+//               that was covered shows as covered. The old code fetched from
+//               today only, so every past row read "Chưa có GV tạm".
 
+const OQ = {
+  todayStr: '', monday: null, sunday: null, from: '', to: '', archFrom: '', farTo: '',
+  offRows: [], nameMap: {}, impact: {}, items: [],
+  view: 'day', filter: 'open', search: '', loaded: false, collapsed: new Set()
+};
+const OQ_DOW_LONG = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
+const OQ_DOW_SHORT = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+const OQ_CAL_URL = 'https://calendar.tansinh.info/';
+
+function oqFmtDM(ymd) { return ymd ? `${ymd.slice(8, 10)}/${ymd.slice(5, 7)}` : ''; }
+function oqFmtDMY(ymd) { return ymd ? `${ymd.slice(8, 10)}/${ymd.slice(5, 7)}/${ymd.slice(0, 4)}` : ''; }
+function oqDow(ymd) { return new Date(ymd + 'T00:00:00').getDay(); }
+function oqNorm(s) { return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase(); }
+function oqName(email) { return OQ.nameMap[email] || email; }
+function oqSubFor(it) { return getSubstituteForStudent(it.studentEmail, it.date, it.role); }
+function oqReasonHtml(reason) {
+  return reason === 'nghỉ' ? '<span class="r-off">nghỉ</span>' : '<span class="r-noshift" title="GV không có ca vào thứ này, lặp lại mỗi tuần">không có ca</span>';
+}
+function oqWindowItems() { return OQ.items.filter(it => it.date >= OQ.from && it.date <= OQ.to); }
+
+async function loadQueue() {
   const { data: { session } } = await client.auth.getSession();
-  if (!session) {
-    content.innerHTML = '<div class="ot-loading"><span>Vui lòng đăng nhập lại.</span></div>';
-    return;
-  }
+  if (!session) { oqShowError('Vui lòng đăng nhập lại.'); return; }
+  const headers = { 'Authorization': `Bearer ${session.access_token}` };
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const todayStr = formatYMD(today);
+  OQ.todayStr = formatYMD(today);
+  OQ.monday = getMonday(today);
+  OQ.sunday = addDays(OQ.monday, 6);
+  OQ.from = OQ.todayStr;
+  OQ.to = formatYMD(addDays(today, 14));
+  OQ.archFrom = formatYMD(addDays(OQ.monday, -56));
+  OQ.farTo = formatYMD(addDays(OQ.sunday, 21));
 
-  const monday = getMonday(today);
-  const sunday = addDays(monday, 6);
-
-  // Section 1: Today → end of this week
-  const sec1From = todayStr;
-  const sec1To = formatYMD(sunday);
-
-  // Section 2: Next 3 weeks (week after this week → 3 weeks out)
-  const sec2From = formatYMD(addDays(sunday, 1));
-  const sec2To = formatYMD(addDays(sunday, 21));
-
-  // Section 3: Past 8 weeks (8 weeks before this Monday → yesterday)
-  const sec3From = formatYMD(addDays(monday, -56));
-  const sec3To = formatYMD(addDays(today, -1));
+  oqWireOnce();
+  oqRenderLoading();
 
   try {
-    // Fetch all meeting_offdays for the entire range
-    const overallFrom = sec3From;
-    const overallTo = sec2To;
+    const [offRes, unm, upc] = await Promise.all([
+      client.from('meeting_offdays')
+        .select('teacher_email, off_date, start_time, end_time')
+        .gte('off_date', OQ.archFrom).lte('off_date', OQ.farTo)
+        .order('off_date', { ascending: true }),
+      fetch(_DO + '/unmatched-students', { headers }).then(r => r.json()),
+      fetch(_DO + '/upcoming-impacted-students', { headers }).then(r => r.json()),
+      loadExistingSubstitutes(OQ.archFrom, OQ.farTo)
+    ]);
+    if (offRes.error) throw offRes.error;
+    if (!unm || !unm.ok) throw new Error((unm && unm.error) || 'Không đọc được HV thiếu GV tuần này');
+    if (!upc || !upc.ok) throw new Error((upc && upc.error) || 'Không đọc được HV bị ảnh hưởng 2 tuần tới');
 
-    const { data: offRows, error } = await client
-      .from('meeting_offdays')
-      .select('teacher_email, off_date, start_time, end_time')
-      .gte('off_date', overallFrom)
-      .lte('off_date', overallTo)
-      .order('off_date', { ascending: true });
+    OQ.offRows = (offRes.data || [])
+      .map(r => ({ ...r, teacher_email: (r.teacher_email || '').toLowerCase() }))
+      .filter(r => r.teacher_email && r.off_date);
+    OQ.items = oqBuildItems(unm.data || {}, upc.data || []);
 
-    if (error) throw error;
-
-    // We need teacher names - fetch from meeting_content
-    const uniqueEmails = [...new Set((offRows || []).map(r => (r.teacher_email || '').toLowerCase()).filter(Boolean))];
-    const nameMap = {};
-
-    if (uniqueEmails.length > 0) {
-      // Fetch teacher names in batches
-      for (const email of uniqueEmails) {
-        const { data: mcRows } = await client
-          .from('meeting_content')
-          .select('teacher_name')
-          .ilike('teacher_email', email)
-          .not('teacher_name', 'is', null)
-          .limit(1);
-
-        if (mcRows && mcRows.length > 0 && mcRows[0].teacher_name) {
-          nameMap[email] = mcRows[0].teacher_name;
-        }
-      }
+    // Teacher names: free from the items, then ONE parallel round for the rest
+    // (the old code ran one query per teacher, one after another).
+    OQ.nameMap = {};
+    for (const it of OQ.items) {
+      if (it.teacherEmail && it.teacherName && it.teacherName !== it.teacherEmail) OQ.nameMap[it.teacherEmail] = it.teacherName;
+    }
+    const offEmails = [...new Set(OQ.offRows.map(r => r.teacher_email))];
+    const missing = offEmails.filter(e => !OQ.nameMap[e]);
+    if (missing.length) {
+      const found = await Promise.all(missing.map(e =>
+        client.from('meeting_content').select('teacher_name').ilike('teacher_email', e)
+          .not('teacher_name', 'is', null).limit(1)
+          .then(r => ({ e, name: r.data && r.data[0] && r.data[0].teacher_name }), () => ({ e, name: null }))
+      ));
+      for (const f of found) if (f.name) OQ.nameMap[f.e] = f.name;
     }
 
-    let schedByTeacherDay = {};
-
-
-    // Fetch impacted students via server function (bypasses RLS)
-
-    if (uniqueEmails.length > 0) {
+    // Weekday-based impact: used for the archive and for days past the 14-day window.
+    OQ.impact = {};
+    if (offEmails.length) {
       try {
-        const { data: { session: sess } } = await client.auth.getSession();
-        const tok = sess?.access_token;
-        if (tok) {
-          const impRes = await fetch(_DO + '/impacted-students', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${tok}`
-            },
-            body: JSON.stringify({ teacherEmails: uniqueEmails })
-          });
-          const impOut = await impRes.json();
-          if (impOut.ok && impOut.data) {
-            schedByTeacherDay = impOut.data;
-          }
-        }
-      } catch (impErr) {
-        console.warn('Could not load impacted students:', impErr);
-      }
+        const r = await fetch(_DO + '/impacted-students', {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ teacherEmails: offEmails })
+        }).then(r => r.json());
+        if (r && r.ok && r.data) OQ.impact = r.data;
+      } catch (e) { console.warn('[offq] impacted-students:', e); }
     }
 
-    // Split rows into 3 sections
-    const rows = offRows || [];
-    const sec1Rows = rows.filter(r => r.off_date >= sec1From && r.off_date <= sec1To);
-    const sec2Rows = rows.filter(r => r.off_date >= sec2From && r.off_date <= sec2To);
-    const sec3Rows = rows.filter(r => r.off_date >= sec3From && r.off_date <= sec3To);
-
-    let html = '';
-
-    // Section 1: This week (today → Sunday)
-    html += buildSection(
-      'Tuần này',
-      `${formatDDMM(today)} → ${formatDDMM(sunday)}`,
-      'current',
-      sec1Rows, nameMap, todayStr,
-      'fa-solid fa-fire',
-      'Không có GV nghỉ từ hôm nay đến cuối tuần',
-      schedByTeacherDay
-    );
-
-    // Section 2: Next 3 weeks
-    const sec2Start = addDays(sunday, 1);
-    const sec2End = addDays(sunday, 21);
-    html += buildSection(
-      '3 tuần tới',
-      `${formatDDMM(sec2Start)} → ${formatDDMM(sec2End)}`,
-      'upcoming',
-      sec2Rows, nameMap, todayStr,
-      'fa-solid fa-calendar-week',
-      'Không có GV nghỉ trong 3 tuần tới',
-      schedByTeacherDay
-    );
-
-    // Section 3: Past 8 weeks
-    const sec3Start = addDays(monday, -56);
-    const sec3End = addDays(today, -1);
-    html += buildSection(
-      '8 tuần trước',
-      `${formatDDMM(sec3Start)} → ${formatDDMM(sec3End)}`,
-      'past',
-      sec3Rows, nameMap, todayStr,
-      'fa-solid fa-clock-rotate-left',
-      'Không có GV nghỉ trong 8 tuần trước',
-      schedByTeacherDay
-    );
-
-    content.innerHTML = html;
-
-    // Wire up toggle collapse
-    content.querySelectorAll('.ot-section-head').forEach(head => {
-      head.addEventListener('click', () => {
-        head.closest('.ot-section').classList.toggle('collapsed');
-      });
-    });
-
+    OQ.loaded = true;
+    oqRenderAll();
   } catch (e) {
-    content.innerHTML = `<div class="ot-loading"><span>Lỗi: ${esc(e.message)}</span></div>`;
+    console.error('[offq] load', e);
+    oqShowError(e.message || String(e));
   }
 }
 
-function formatDDMM(d) {
-  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+function oqBuildItems(unm, upc) {
+  const map = new Map();
+  const put = (dateStr, s, override) => {
+    if (!dateStr || !s) return;
+    const role = s.role === 'Breakout' ? 'Breakout' : 'TTKB';
+    const email = (s.student_email || '').toLowerCase();
+    const key = `${dateStr}|${email}|${role}`;
+    if (map.has(key) && !override) return;
+    map.set(key, {
+      key, date: dateStr, dow: oqDow(dateStr), time: (s.time_local || '').slice(0, 5),
+      studentEmail: s.student_email, studentName: s.student_name || s.student_email || '?', role,
+      teacherEmail: (s.teacher_email || '').toLowerCase(), teacherName: s.teacher_name || s.teacher_email || '?',
+      reason: s.reason === 'nghỉ' ? 'nghỉ' : 'không có ca',
+      minutes: s.student_minutes || 0, level: s.student_level || ''
+    });
+  };
+  for (const dow in unm) {
+    const n = Number(dow);
+    if (Number.isNaN(n)) continue;
+    const dateStr = formatYMD(addDays(OQ.monday, n === 0 ? 6 : n - 1));
+    for (const s of (unm[dow] || [])) put(dateStr, s, false);
+  }
+  for (const day of upc) for (const s of (day.students || [])) put(day.date, s, true);
+  return [...map.values()];
 }
 
-function buildSection(title, dateRange, type, rows, nameMap, todayStr, icon, emptyMsg, schedByTeacherDay) {
-  const uniqueTeachers = new Set(rows.map(r => (r.teacher_email || '').toLowerCase()).filter(Boolean));
-  const countLabel = `${uniqueTeachers.size} GV`;
+function oqMatches(it) {
+  const sub = oqSubFor(it);
+  if (OQ.filter === 'open' && sub) return false;
+  if (OQ.filter === 'done' && !sub) return false;
+  if (OQ.filter === 'off' && it.reason !== 'nghỉ') return false;
+  if (OQ.filter === 'noshift' && it.reason === 'nghỉ') return false;
+  if (OQ.search) {
+    const q = oqNorm(OQ.search);
+    if (!oqNorm(it.studentName).includes(q) && !oqNorm(it.teacherName).includes(q)) return false;
+  }
+  return true;
+}
 
-  let bodyHtml = '';
+function oqPickerInfo(it) {
+  return {
+    studentEmail: it.studentEmail, studentName: it.studentName,
+    originalTeacherEmail: it.teacherEmail, originalTeacherName: it.teacherName,
+    reason: it.reason, dateYMD: it.date,
+    dateLabel: `${OQ_DOW_LONG[it.dow]} ${oqFmtDM(it.date)}`, dayOfWeek: it.dow,
+    timeLocal: it.time, studentMinutes: it.minutes, studentLevel: it.level, role: it.role
+  };
+}
 
-  if (rows.length === 0) {
-    bodyHtml = `<div class="ot-section-body ot-empty"><i class="fa-solid fa-check-circle" style="font-size:2rem;color:#22c55e;display:block;margin-bottom:8px"></i>${esc(emptyMsg)}</div>`;
-  } else {
-    // Group by date
-    const dayMap = {};
-    for (const r of rows) {
-      const date = r.off_date;
-      if (!dayMap[date]) dayMap[date] = {};
-      const email = (r.teacher_email || '').toLowerCase();
-      if (!email) continue;
-      if (!dayMap[date][email]) {
-        dayMap[date][email] = {
-          name: nameMap[email] || email,
-          email: email,
-          shifts: []
-        };
-      }
-      const time = `${(r.start_time || '').slice(0, 5)}–${(r.end_time || '').slice(0, 5)}`;
-      if (!dayMap[date][email].shifts.includes(time)) {
-        dayMap[date][email].shifts.push(time);
-      }
+let oqWired = false;
+function oqWireOnce() {
+  if (oqWired) return;
+  oqWired = true;
+  document.addEventListener('click', (e) => {
+    const pick = e.target.closest('[data-oq-pick]');
+    if (pick) {
+      const it = OQ.items.find(x => x.key === pick.getAttribute('data-oq-pick'));
+      if (it) openSubPicker(oqPickerInfo(it));
+      return;
     }
+    const seg = e.target.closest('.oq-seg-btn');
+    if (seg) { OQ.view = seg.dataset.view === 'teacher' ? 'teacher' : 'day'; oqRenderAll(); return; }
+    const chip = e.target.closest('.oq-chip');
+    if (chip) { OQ.filter = chip.dataset.filter || 'all'; oqRenderAll(); return; }
+    const head = e.target.closest('.oq-day-head');
+    if (head) {
+      const box = head.closest('[data-oq-id]');
+      if (box) {
+        box.classList.toggle('is-collapsed');
+        if (box.classList.contains('is-collapsed')) OQ.collapsed.add(box.dataset.oqId); else OQ.collapsed.delete(box.dataset.oqId);
+      }
+      return;
+    }
+    const ph = e.target.closest('.oq-past-head');
+    if (ph) { ph.closest('.oq-past-sec')?.classList.toggle('is-collapsed'); }
+  });
+  const inp = document.getElementById('oqSearch');
+  if (inp) {
+    let t;
+    inp.addEventListener('input', () => {
+      clearTimeout(t);
+      t = setTimeout(() => { OQ.search = inp.value.trim(); oqRenderQueue(); }, 150);
+    });
+  }
+}
 
-    const sortedDates = Object.keys(dayMap).sort((a, b) => type === 'past' ? b.localeCompare(a) : a.localeCompare(b));
+// ---------- rendering ----------
 
-    let daysHtml = '';
-    for (const date of sortedDates) {
-      const d = new Date(date + 'T00:00:00');
-      const dow = dayLabels[d.getDay()];
-      const dd = String(d.getDate()).padStart(2, '0');
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const isToday = date === todayStr;
-      const todayTag = isToday ? `<span class="ot-day-today-tag">Hôm nay</span>` : '';
+function oqRenderAll() { oqRenderSummary(); oqRenderChips(); oqRenderQueue(); oqRenderPast(); }
 
-      const teachers = Object.values(dayMap[date]).sort((a, b) => a.name.localeCompare(b.name));
-      const dowNum = d.getDay();
+function oqRenderLoading() {
+  const q = document.getElementById('oqQueue');
+  if (q) q.innerHTML = '<div class="ot-loading"><i class="fa-solid fa-spinner"></i><span>Đang tải dữ liệu...</span></div>';
+  oqRenderSummary();
+  oqRenderChips();
+}
 
-      const headClass = type === 'past' ? 'ot-day-head--past' : (type === 'upcoming' ? 'ot-day-head--upcoming' : (isToday ? 'ot-day-head--today' : ''));
+function oqShowError(msg) {
+  const q = document.getElementById('oqQueue');
+  if (q) q.innerHTML = `<div class="ot-loading"><span>Lỗi: ${esc(msg)}</span></div>`;
+}
 
-      const teacherItems = teachers.map(t => {
-        const ini = initials(t.name);
-        const shiftsText = t.shifts.join(', ');
-        const impactKey = `${t.email}|${dowNum}`;
-        const impacted = (schedByTeacherDay || {})[impactKey] || [];
-        const studentsHtml = impacted.length > 0 ? `
-          <div class="ot-impacted">
-            <div class="ot-impacted-title">
-              <i class="fa-solid fa-user-graduate"></i>
-              HV bị ảnh hưởng (${impacted.length})
-            </div>
-            <div class="ot-impacted-list">
-              ${impacted.map(s => `<span class="ot-student-chip">${esc(s.name)}</span>`).join('')}
-            </div>
-          </div>` : '';
-        return `
-          <div class="ot-teacher">
-            <div class="ot-teacher-avatar">${esc(ini)}</div>
-            <div class="ot-teacher-info">
-              <div class="ot-teacher-name">${esc(t.name)}</div>
-              <div class="ot-teacher-shifts"><i class="fa-regular fa-clock"></i> ${esc(shiftsText)}</div>
-            </div>
-          </div>
-          ${studentsHtml}`;
+function oqRenderSummary() {
+  const el = document.getElementById('oqSummary');
+  if (!el) return;
+  if (!OQ.loaded) { el.innerHTML = '<div class="oq-stat"><b>…</b><span>Đang tải</span></div>'; return; }
+  const win = oqWindowItems();
+  const open = win.filter(it => !oqSubFor(it)).length;
+  const done = win.length - open;
+  const offT = new Set(OQ.offRows.filter(r => r.off_date >= OQ.from && r.off_date <= OQ.to).map(r => r.teacher_email)).size;
+  const noshift = new Set(win.filter(it => it.reason !== 'nghỉ').map(it => `${it.studentEmail}|${it.dow}|${it.role}`)).size;
+  el.innerHTML = `
+    <div class="oq-stat ${open ? 'is-open' : 'is-done'}"><b>${open}</b><span>buổi chưa có GV tạm</span></div>
+    <div class="oq-stat is-done"><b>${done}</b><span>buổi đã gán GV tạm</span></div>
+    <div class="oq-stat"><b>${offT}</b><span>GV nghỉ, hôm nay → ${oqFmtDM(OQ.to)}</span></div>
+    <div class="oq-stat ${noshift ? 'is-warn' : ''}"><b>${noshift}</b><span>lịch không có ca cố định</span></div>`;
+}
+
+function oqRenderChips() {
+  const el = document.getElementById('oqChips');
+  if (!el) return;
+  const win = OQ.loaded ? oqWindowItems() : [];
+  const c = {
+    all: win.length,
+    open: win.filter(it => !oqSubFor(it)).length,
+    done: win.filter(it => !!oqSubFor(it)).length,
+    off: win.filter(it => it.reason === 'nghỉ').length,
+    noshift: win.filter(it => it.reason !== 'nghỉ').length
+  };
+  const defs = [['all', 'Tất cả'], ['open', 'Chưa gán'], ['done', 'Đã gán'], ['off', 'GV nghỉ'], ['noshift', 'Không có ca']];
+  el.innerHTML = defs.map(([k, label]) =>
+    `<button type="button" class="oq-chip c-${k}${OQ.filter === k ? ' is-on' : ''}" data-filter="${k}">${label}<small>${OQ.loaded ? c[k] : ''}</small></button>`
+  ).join('');
+}
+
+function oqRenderQueue() {
+  const el = document.getElementById('oqQueue');
+  if (!el || !OQ.loaded) return;
+  el.innerHTML = OQ.view === 'teacher' ? oqHtmlByTeacher() : oqHtmlByDay();
+}
+
+function oqHtmlEmpty() {
+  const filtered = OQ.filter !== 'all' || !!OQ.search;
+  let text;
+  if (OQ.search) text = 'Không có buổi nào khớp với từ tìm kiếm.';
+  else if (OQ.filter === 'open') text = `Tất cả buổi từ hôm nay đến ${oqFmtDM(OQ.to)} đã có GV tạm.`;
+  else if (filtered) text = 'Không có buổi nào khớp bộ lọc này.';
+  else text = `Không có HV nào thiếu GV từ hôm nay đến ${oqFmtDM(OQ.to)}.`;
+  return `<div class="oq-empty"><i class="fa-solid fa-circle-check"></i>${text}</div>`;
+}
+
+function oqHtmlByDay() {
+  const items = oqWindowItems();
+  const byDate = new Map();
+  for (const it of items) { if (!byDate.has(it.date)) byDate.set(it.date, []); byDate.get(it.date).push(it); }
+  const offByDate = new Map();
+  for (const r of OQ.offRows) {
+    if (r.off_date < OQ.from || r.off_date > OQ.farTo) continue;
+    if (!offByDate.has(r.off_date)) offByDate.set(r.off_date, []);
+    offByDate.get(r.off_date).push(r);
+  }
+  const dates = [...new Set([...byDate.keys(), ...offByDate.keys()])].sort();
+  const searching = !!OQ.search;
+  const out = [];
+  for (const date of dates) {
+    const all = byDate.get(date) || [];
+    const shown = all.filter(oqMatches);
+    const offs = offByDate.get(date) || [];
+    if (searching && !shown.length) continue;
+    if (all.length && !shown.length && OQ.filter !== 'open') continue;
+    if (!all.length && !['all', 'open', 'off'].includes(OQ.filter)) continue;
+    out.push(oqHtmlDay(date, all, shown, offs, 'live'));
+  }
+  return out.length ? out.join('') : oqHtmlEmpty();
+}
+
+// mode: 'live' (today onward), 'past' (this week, before today), 'archive' (older, off-days only)
+function oqHtmlDay(date, all, shown, offs, mode) {
+  const dow = oqDow(date);
+  const isToday = date === OQ.todayStr;
+  const beyond = date > OQ.to;
+  const open = all.filter(it => !oqSubFor(it)).length;
+  const collapsed = OQ.collapsed.has(date) ? ' is-collapsed' : '';
+
+  let meta = '';
+  if (all.length) meta = open ? `${all.length} buổi · <b>${open} chưa gán</b>` : `${all.length} buổi · đã gán đủ`;
+  else if (beyond) meta = 'ngoài 14 ngày';
+  else if (mode === 'archive') meta = `${new Set(offs.map(r => r.teacher_email)).size} GV nghỉ`;
+  else if (offs.length) meta = 'không có HV học';
+
+  const offByT = new Map();
+  for (const r of offs) {
+    if (!offByT.has(r.teacher_email)) offByT.set(r.teacher_email, []);
+    const t = `${(r.start_time || '').slice(0, 5)}–${(r.end_time || '').slice(0, 5)}`;
+    if (!offByT.get(r.teacher_email).includes(t)) offByT.get(r.teacher_email).push(t);
+  }
+  const noshiftT = new Map();
+  for (const it of all) {
+    if (it.reason === 'nghỉ') continue;
+    if (!noshiftT.has(it.teacherEmail)) noshiftT.set(it.teacherEmail, { name: it.teacherName, n: 0 });
+    noshiftT.get(it.teacherEmail).n++;
+  }
+
+  let causes = '';
+  for (const [email, times] of offByT) {
+    const name = oqName(email);
+    const nHere = all.filter(it => it.teacherEmail === email).length;
+    const forecast = (OQ.impact[`${email}|${dow}`] || []).length;
+    let count;
+    if (nHere) count = `${nHere} HV`;
+    else if ((beyond || mode === 'archive') && forecast) count = `${forecast} HV theo lịch tuần`;
+    else if (beyond || mode === 'archive') count = '';
+    else count = 'không có HV';
+    causes += `<div class="oq-cause"><span class="oq-cause-av">${esc(initials(name))}</span><span><b>${esc(name)}</b> nghỉ ${esc(times.join(', '))}</span><span class="oq-cause-right">${count ? `<i class="fa-solid fa-user-graduate"></i> ${count}` : ''}</span></div>`;
+  }
+  for (const [, v] of noshiftT) {
+    causes += `<div class="oq-cause is-noshift"><span class="oq-cause-av">${esc(initials(v.name))}</span><span><b>${esc(v.name)}</b> không có ca ${OQ_DOW_LONG[dow].toLowerCase()} · lặp lại mỗi tuần · ${v.n} HV</span><span class="oq-cause-right"><a href="${OQ_CAL_URL}" target="_blank" rel="noopener"><i class="fa-solid fa-calendar-check"></i> Sửa lịch</a></span></div>`;
+  }
+
+  let body = '';
+  if (shown.length) body = `<div class="oq-rows">${oqHtmlRows(shown, false, mode === 'past')}</div>`;
+  else if (all.length) body = `<div class="oq-day-note"><i class="fa-solid fa-circle-check" style="color:#22c55e"></i> ${all.length} buổi đã gán đủ GV tạm.</div>`;
+  else if (beyond) body = '<div class="oq-day-note">Danh sách HV cụ thể sẽ hiện khi còn 14 ngày.</div>';
+  else if (mode === 'archive') body = '';
+  else body = '<div class="oq-day-note">Không có HV nào học trong ngày này.</div>';
+
+  return `<section class="oq-day${isToday ? ' is-today' : ''}${collapsed}" data-oq-id="${date}">
+    <header class="oq-day-head">
+      <span class="oq-day-dow">${OQ_DOW_LONG[dow]}</span><span class="oq-day-date">${oqFmtDM(date)}</span>${isToday ? '<span class="oq-tag">hôm nay</span>' : ''}
+      <span class="oq-day-meta">${meta}</span><i class="fa-solid fa-chevron-down oq-day-chev"></i>
+    </header>
+    ${causes}${body}
+  </section>`;
+}
+
+function oqHtmlRows(items, withDate, isPast) {
+  const byStudent = new Map();
+  for (const it of items) {
+    const k = `${it.date}|${it.studentEmail}`;
+    if (!byStudent.has(k)) byStudent.set(k, []);
+    byStudent.get(k).push(it);
+  }
+  const order = { open: 0, partial: 1, done: 2 };
+  const groups = [...byStudent.values()].map(g => {
+    g.sort((a, b) => (a.role === 'TTKB' ? 0 : 1) - (b.role === 'TTKB' ? 0 : 1));
+    const nd = g.filter(it => !!oqSubFor(it)).length;
+    const time = g.reduce((m, it) => (it.time && (!m || it.time < m)) ? it.time : m, '');
+    return { g, time, state: nd === g.length ? 'done' : (nd ? 'partial' : 'open') };
+  });
+  groups.sort((a, b) => (order[a.state] - order[b.state]) || a.g[0].date.localeCompare(b.g[0].date) || a.time.localeCompare(b.time));
+
+  return groups.map(({ g, time, state }) => {
+    const f = g[0];
+    const pills = g.map(it => `<span class="oq-pill ${it.role === 'Breakout' ? 'br' : 'ttkb'}">${it.role}</span>`).join('');
+    const teachers = [...new Set(g.map(it => it.teacherName))].map(esc).join(', ');
+    const when = withDate ? `${OQ_DOW_SHORT[f.dow]} ${oqFmtDM(f.date)}<br>${esc(time)}` : esc(time);
+    let act = '';
+    if (g.length === 1) {
+      const sub = oqSubFor(f);
+      act = sub
+        ? `<span class="oq-done"><i class="fa-solid fa-circle-check"></i> GV tạm: ${esc(sub.substitute_teacher_name || sub.substitute_teacher_email)}</span><button type="button" class="oq-link" data-oq-pick="${f.key}">Đổi</button>`
+        : `<button type="button" class="oq-btn${isPast ? '' : ' primary'}" data-oq-pick="${f.key}"><i class="fa-solid fa-user-plus"></i> ${isPast ? 'Ghi nhận GV tạm' : 'Gán GV tạm'}</button>`;
+    } else {
+      act = g.map(it => {
+        const sub = oqSubFor(it);
+        return sub
+          ? `<button type="button" class="oq-rolectl done" data-oq-pick="${it.key}" title="Đổi GV tạm"><i class="fa-solid fa-check"></i> ${it.role}: ${esc((sub.substitute_teacher_name || sub.substitute_teacher_email || '').split(' ').pop())}</button>`
+          : `<button type="button" class="oq-rolectl open" data-oq-pick="${it.key}"><i class="fa-solid fa-user-plus"></i> ${it.role}: ${isPast ? 'Ghi nhận' : 'Gán'}</button>`;
       }).join('');
-
-      daysHtml += `
-        <div class="ot-day">
-          <div class="ot-day-head ${headClass}">
-            <span class="ot-day-dow">${dow}</span>
-            <span class="ot-day-date">${dd}/${mm}</span>
-            ${todayTag}
-            <span class="ot-day-count">${teachers.length} GV</span>
-          </div>
-          ${teacherItems}
-        </div>`;
     }
+    return `<div class="oq-row is-${state}">
+      <span class="oq-time">${when}</span>
+      <div class="oq-main"><div class="oq-name">${esc(f.studentName)}${pills}</div><div class="oq-subline">GV: ${teachers} · ${oqReasonHtml(f.reason)}</div></div>
+      <div class="oq-act">${act}</div>
+    </div>`;
+  }).join('');
+}
 
-    bodyHtml = `<div class="ot-section-body">${daysHtml}</div>`;
-  }
-
-  // Past section starts collapsed
-  const collapsedClass = type === 'past' ? ' collapsed' : '';
-
-  return `
-    <section class="ot-section${collapsedClass}">
-      <div class="ot-section-head ot-section-head--${type}">
-        <h2><i class="${icon}"></i> ${esc(title)}</h2>
-        <span style="font-size:0.82rem;font-weight:500;opacity:0.85">${esc(dateRange)}</span>
-        <span class="ot-section-badge">${countLabel}</span>
-        <i class="fa-solid fa-chevron-down ot-section-chevron"></i>
-      </div>
-      ${bodyHtml}
+function oqHtmlByTeacher() {
+  const items = oqWindowItems().filter(oqMatches);
+  if (!items.length) return oqHtmlEmpty();
+  const byT = new Map();
+  for (const it of items) { if (!byT.has(it.teacherEmail)) byT.set(it.teacherEmail, []); byT.get(it.teacherEmail).push(it); }
+  const cards = [...byT.entries()].map(([email, g]) => {
+    const name = g[0].teacherName;
+    const open = g.filter(it => !oqSubFor(it)).length;
+    const offDates = [...new Set(OQ.offRows.filter(r => r.teacher_email === email && r.off_date >= OQ.from && r.off_date <= OQ.to).map(r => r.off_date))].map(oqFmtDM);
+    const nsDows = [...new Set(g.filter(it => it.reason !== 'nghỉ').map(it => it.dow))].map(d => OQ_DOW_LONG[d].toLowerCase());
+    const bits = [];
+    if (offDates.length) bits.push('nghỉ ' + offDates.join(', '));
+    if (nsDows.length) bits.push('không có ca ' + nsDows.join(', ') + ' (lặp lại mỗi tuần)');
+    const id = 't:' + email;
+    const html = `<section class="oq-teacher${OQ.collapsed.has(id) ? ' is-collapsed' : ''}" data-oq-id="${esc(id)}">
+      <header class="oq-day-head oq-teacher-head">
+        <span class="oq-teacher-av">${esc(initials(name))}</span>
+        <div style="flex:1;min-width:0"><div class="oq-teacher-name">${esc(name)}</div><div class="oq-teacher-sub">${esc(bits.join(' · '))}</div></div>
+        <span class="oq-day-meta">${g.length} buổi · ${open ? `<b>${open} chưa gán</b>` : 'đã gán đủ'}</span><i class="fa-solid fa-chevron-down oq-day-chev"></i>
+      </header>
+      <div class="oq-rows">${oqHtmlRows(g, true, false)}</div>
     </section>`;
+    return { open, n: g.length, html };
+  });
+  cards.sort((a, b) => (b.open - a.open) || (b.n - a.n));
+  return cards.map(c => c.html).join('');
 }
 
-// ========== HELPER: Group students by email for merged cards ==========
-function groupStudentsByEmail(students) {
-  const groups = {};
-  for (const s of students) {
-    const key = s.student_email;
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(s);
+function oqRenderPast() {
+  const el = document.getElementById('oqPast');
+  if (!el || !OQ.loaded) return;
+  const mondayStr = formatYMD(OQ.monday);
+  const yesterday = formatYMD(addDays(new Date(OQ.todayStr + 'T00:00:00'), -1));
+
+  // 1. this week, before today — real items, real assignments
+  const past = OQ.items.filter(it => it.date < OQ.todayStr);
+  const byDate = new Map();
+  for (const it of past) { if (!byDate.has(it.date)) byDate.set(it.date, []); byDate.get(it.date).push(it); }
+  const offWeek = new Map();
+  for (const r of OQ.offRows) {
+    if (r.off_date < mondayStr || r.off_date >= OQ.todayStr) continue;
+    if (!offWeek.has(r.off_date)) offWeek.set(r.off_date, []);
+    offWeek.get(r.off_date).push(r);
   }
-  return groups;
+  const pastDates = [...new Set([...byDate.keys(), ...offWeek.keys()])].sort().reverse();
+  const openN = past.filter(it => !oqSubFor(it)).length;
+  let sec1 = '';
+  if (pastDates.length) {
+    sec1 = `<section class="oq-past-sec is-collapsed">
+      <div class="oq-past-head"><i class="fa-solid fa-clock-rotate-left"></i><span><b>Đã qua, tuần này</b> · ${oqFmtDM(mondayStr)} – ${oqFmtDM(yesterday)} · ${past.length} buổi${openN ? `, <span style="color:#dc2626;font-weight:700">${openN} không có GV tạm</span>` : ''}</span><i class="fa-solid fa-chevron-down oq-day-chev"></i></div>
+      <div class="oq-past-body">${pastDates.map(d => oqHtmlDay(d, byDate.get(d) || [], byDate.get(d) || [], offWeek.get(d) || [], 'past')).join('')}</div>
+    </section>`;
+  }
+
+  // 2. the 8 weeks before this one — off-days only
+  const arch = OQ.offRows.filter(r => r.off_date < mondayStr);
+  const archByDate = new Map();
+  for (const r of arch) { if (!archByDate.has(r.off_date)) archByDate.set(r.off_date, []); archByDate.get(r.off_date).push(r); }
+  const archDates = [...archByDate.keys()].sort().reverse();
+  const teachersN = new Set(arch.map(r => r.teacher_email)).size;
+  const sec2 = `<section class="oq-past-sec is-collapsed">
+    <div class="oq-past-head"><i class="fa-solid fa-box-archive"></i><span><b>8 tuần trước</b> · ${oqFmtDM(OQ.archFrom)} – ${oqFmtDM(formatYMD(addDays(OQ.monday, -1)))} · ${teachersN} GV nghỉ</span><i class="fa-solid fa-chevron-down oq-day-chev"></i></div>
+    <div class="oq-past-body">${archDates.length ? archDates.map(d => oqHtmlDay(d, [], [], archByDate.get(d), 'archive')).join('') : '<div class="oq-day-note">Không có GV nghỉ trong 8 tuần trước.</div>'}</div>
+  </section>`;
+
+  el.innerHTML = sec1 + sec2;
 }
 
-// ========== UNMATCHED STUDENTS (HV không có GV phụ trách) ==========
-
-async function loadUnmatchedStudents() {
-  const content = document.getElementById('umContent');
-  if (!content) return;
-
-  const { data: { session } } = await client.auth.getSession();
-  if (!session) {
-    content.innerHTML = '<div class="ot-loading"><span>Vui lòng đăng nhập lại.</span></div>';
-    return;
-  }
-
-  try {
-    const res = await fetch(_DO + '/unmatched-students', {
-      headers: { 'Authorization': `Bearer ${session.access_token}` }
-    });
-    const out = await res.json();
-    if (!res.ok || !out.ok) throw new Error(out.error || 'Lỗi');
-
-    const data = out.data || {};
-    const dayLabelsLong = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
-
-    // Get this week's dates for display
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const monday = getMonday(today);
-
-    // Reorder: today first, then backwards (most recent on top)
-    const todayDow = today.getDay(); // 0=Sun...6=Sat
-    const dowOrder = [];
-    for (let i = 0; i < 7; i++) {
-      dowOrder.push((todayDow - i + 7) % 7);
-    }
-
-    // Count total unique students
-    const allStudents = new Set();
-    for (const dow in data) {
-      for (const s of data[dow]) {
-        allStudents.add(s.student_email);
-      }
-    }
-
-    let bodyHtml = '';
-
-    if (allStudents.size === 0) {
-      bodyHtml = `<div class="um-section-body um-empty">
-        <i class="fa-solid fa-check-circle" style="font-size:2rem;color:#22c55e;display:block;margin-bottom:8px"></i>
-        Tất cả HV đã có GV phụ trách trong tuần này
-      </div>`;
-    } else {
-      let daysHtml = '';
-
-      for (const dow of dowOrder) {
-        const students = data[dow];
-        if (!students || !students.length) continue;
-
-        // Calculate the actual date for this day of the week
-        const dayOffset = dow === 0 ? 6 : dow - 1;
-        const dayDate = addDays(monday, dayOffset);
-        const dd = String(dayDate.getDate()).padStart(2, '0');
-        const mm = String(dayDate.getMonth() + 1).padStart(2, '0');
-        const dateStr = `${dayDate.getFullYear()}-${mm}-${dd}`;
-
-        const grouped = groupStudentsByEmail(students);
-        const uniqueCount = Object.keys(grouped).length;
-
-        const studentItems = Object.values(grouped).map(entries => {
-          const first = entries[0];
-          const ini = initials(first.student_name);
-          const timeStr = (first.time_local || '').slice(0, 5);
-          const isMulti = entries.length > 1;
-
-          // Check if ALL roles have subs
-          const allHaveSub = entries.every(s => {
-            const role = s.role === 'Breakout' ? 'Breakout' : 'TTKB';
-            return !!getSubstituteForStudent(s.student_email, dateStr, role);
-          });
-          const anyHasSub = entries.some(s => {
-            const role = s.role === 'Breakout' ? 'Breakout' : 'TTKB';
-            return !!getSubstituteForStudent(s.student_email, dateStr, role);
-          });
-          const cardClass = allHaveSub ? 'um-student--has-sub' : (anyHasSub ? 'um-student--partial-sub' : 'um-student--no-sub');
-
-          
-
-          // Single entry → original flat layout; multi → merged card
-          if (!isMulti) {
-            const s = first;
-            const sub = getSubstituteForStudent(s.student_email, dateStr, s.role === 'Breakout' ? 'Breakout' : 'TTKB');
-            const subBadge = sub
-              ? `<div class="um-sub-badge"><i class="fa-solid fa-circle-check"></i> GV tạm (${esc(s.role || 'TTKB')}): ${esc(sub.substitute_teacher_name || sub.substitute_teacher_email)}</div>`
-              : `<div class="um-no-sub-badge"><i class="fa-solid fa-circle-xmark"></i> Chưa có GV tạm</div>`;
-            return `
-            <div class="um-student ${cardClass}">
-              <div class="um-student-avatar">${esc(ini)}</div>
-              <div class="um-student-info">
-              <div class="um-student-name" style="cursor:pointer;text-decoration:underline;text-decoration-color:#d9770640;" onclick='openSubPicker(${JSON.stringify({
-                studentEmail: s.student_email, studentName: s.student_name,
-                originalTeacherEmail: s.teacher_email, originalTeacherName: s.teacher_name,
-                reason: s.reason || "nghỉ", dateYMD: dateStr,
-                dateLabel: dayLabelsLong[dow] + " " + dd + "/" + mm, dayOfWeek: dow,
-                timeLocal: (s.time_local || "").slice(0, 5),
-                studentMinutes: s.student_minutes || 0, studentLevel: s.student_level || "",
-                role: s.role || "TTKB"
-              }).replace(/'/g, "\\u0027")})'>${esc(s.student_name)}</div>
-                <div class="um-student-teacher">
-                  <i class="fa-solid fa-chalkboard-user"></i>
-                  GV: ${esc(s.teacher_name)} <span style="color:${s.reason === 'nghỉ' ? '#ef4444' : '#f59e0b'};font-weight:600">(${esc(s.reason || 'không có ca')})</span>
-                  <span style="margin-left:4px;padding:1px 6px;border-radius:4px;font-size:0.65rem;font-weight:700;background:${s.role === 'Breakout' ? '#ede9fe' : '#dbeafe'};color:${s.role === 'Breakout' ? '#7c3aed' : '#2563eb'};border:1px solid ${s.role === 'Breakout' ? '#c4b5fd' : '#bfdbfe'}">${esc(s.role || 'TTKB')}</span>
-                </div>
-                ${subBadge}
-              </div>
-              <span class="um-student-time">${esc(timeStr)}</span>
-            </div>`;
-          }
-
-          // Multi-role: compact pill badges
-          const teacherName = first.teacher_name;
-          const reason = first.reason || 'nghỉ';
-          const reasonColor = reason === 'nghỉ' ? '#ef4444' : '#f59e0b';
-
-          const rolePills = entries.map(s => {
-            const role = s.role === 'Breakout' ? 'Breakout' : 'TTKB';
-            const sub = getSubstituteForStudent(s.student_email, dateStr, role);
-            const isBR = role === 'Breakout';
-            const dotColor = sub ? '#22c55e' : '#ef4444';
-            const pillBg = sub ? '#dcfce7' : (isBR ? '#ede9fe' : '#dbeafe');
-            const pillColor = sub ? '#15803d' : (isBR ? '#7c3aed' : '#2563eb');
-            const pillBorder = sub ? '#86efac' : (isBR ? '#c4b5fd' : '#bfdbfe');
-            const subName = sub ? esc(sub.substitute_teacher_name || sub.substitute_teacher_email).split(' ').pop() : '';
-
-            const pickerData = JSON.stringify({
-              studentEmail: s.student_email, studentName: s.student_name,
-              originalTeacherEmail: s.teacher_email, originalTeacherName: s.teacher_name,
-              reason: s.reason || "nghỉ", dateYMD: dateStr,
-              dateLabel: dayLabelsLong[dow] + " " + dd + "/" + mm, dayOfWeek: dow,
-              timeLocal: (s.time_local || "").slice(0, 5),
-              studentMinutes: s.student_minutes || 0, studentLevel: s.student_level || "",
-              role: role
-            }).replace(/'/g, "\\u0027");
-
-            return `<span class="um-role-pill" onclick='openSubPicker(${pickerData})' style="background:${pillBg};color:${pillColor};border-color:${pillBorder}">${esc(role)} <span class="um-role-dot" style="background:${dotColor}"></span>${subName ? ` <span class="um-role-sub-name">${subName}</span>` : ''}</span>`;
-          }).join('');
-
-          return `
-            <div class="um-student ${cardClass}">
-              <div class="um-student-avatar">${esc(ini)}</div>
-              <div class="um-student-info">
-                <div class="um-student-name">${esc(first.student_name)}</div>
-                <div class="um-student-teacher">
-                  <i class="fa-solid fa-chalkboard-user"></i>
-                  GV: ${esc(teacherName)} <span style="color:${reasonColor};font-weight:600">(${esc(reason)})</span>
-                </div>
-                <div class="um-role-pills">${rolePills}</div>
-              </div>
-              <span class="um-student-time">${esc(timeStr)}</span>
-            </div>`;
-
-        }).join('');
-
-        daysHtml += `
-          <div class="um-day">
-            <div class="um-day-head">
-              <span class="um-day-dow">${dayLabelsLong[dow]}</span>
-              <span class="um-day-date">${dd}/${mm}</span>
-              <span class="um-day-count">${uniqueCount} HV</span>
-            </div>
-            ${studentItems}
-          </div>`;
-      }
-
-      bodyHtml = `<div class="um-section-body">${daysHtml}</div>`;
-    }
-
-    content.innerHTML = `
-      <section class="um-section">
-        <div class="um-section-head">
-          <h2><i class="fa-solid fa-triangle-exclamation"></i> HV không có GV phụ trách</h2>
-          <span class="um-section-badge">${allStudents.size} HV</span>
-          <i class="fa-solid fa-chevron-down um-section-chevron"></i>
-        </div>
-        ${bodyHtml}
-      </section>`;
-
-    // Wire up collapse toggle
-    content.querySelector('.um-section-head')?.addEventListener('click', () => {
-      content.querySelector('.um-section')?.classList.toggle('collapsed');
-    });
-
-  } catch (e) {
-    content.innerHTML = `<div class="ot-loading"><span>Lỗi: ${esc(e.message)}</span></div>`;
-  }
+async function oqAfterChange() {
+  await loadExistingSubstitutes(OQ.archFrom, OQ.farTo);
+  const y = window.scrollY;
+  oqRenderAll();
+  window.scrollTo(0, y);
 }
 
-
-// ========== UPCOMING IMPACTED STUDENTS (2 tuần tới) ==========
-
-// ========== UPCOMING IMPACTED STUDENTS (2 tuần tới) ==========
-
-async function loadUpcomingImpacted() {
-  const content = document.getElementById('uiContent');
-  if (!content) return;
-
-  const { data: { session } } = await client.auth.getSession();
-  if (!session) {
-    content.innerHTML = '<div class="ot-loading"><span>Vui lòng đăng nhập lại.</span></div>';
-    return;
-  }
-
-  try {
-    const res = await fetch(_DO + '/upcoming-impacted-students', {
-      headers: { 'Authorization': `Bearer ${session.access_token}` }
-    });
-    const out = await res.json();
-    if (!res.ok || !out.ok) throw new Error(out.error || 'Lỗi');
-
-    const data = out.data || [];
-
-    // Count unique students
-    const allStudents = new Set();
-    for (const day of data) {
-      for (const s of day.students) {
-        allStudents.add(s.student_email);
-      }
-    }
-
-    let bodyHtml = '';
-
-    if (data.length === 0) {
-      bodyHtml = `<div class="ui-section-body ui-empty">
-        <i class="fa-solid fa-check-circle" style="font-size:2rem;color:#22c55e;display:block;margin-bottom:8px"></i>
-        Không có HV bị ảnh hưởng trong 2 tuần tới
-      </div>`;
-    } else {
-      const dayLabelsLong = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
-      let daysHtml = '';
-
-      for (const day of data) {
-        const d = new Date(day.date + 'T00:00:00');
-        const dow = d.getDay();
-        const dd = String(d.getDate()).padStart(2, '0');
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-
-        const students = day.students;
-
-        const grouped = groupStudentsByEmail(students);
-        const uniqueCount = Object.keys(grouped).length;
-
-        const studentItems = Object.values(grouped).map(entries => {
-          const first = entries[0];
-          const ini = initials(first.student_name);
-          const timeStr = (first.time_local || '').slice(0, 5);
-          const isMulti = entries.length > 1;
-
-          const allHaveSub = entries.every(s => {
-            const role = s.role === 'Breakout' ? 'Breakout' : 'TTKB';
-            return !!getSubstituteForStudent(s.student_email, day.date, role);
-          });
-          const anyHasSub = entries.some(s => {
-            const role = s.role === 'Breakout' ? 'Breakout' : 'TTKB';
-            return !!getSubstituteForStudent(s.student_email, day.date, role);
-          });
-          const cardClass = allHaveSub ? 'um-student--has-sub' : (anyHasSub ? 'um-student--partial-sub' : 'um-student--no-sub');
-
-          
-
-          if (!isMulti) {
-            const s = first;
-            const sub = getSubstituteForStudent(s.student_email, day.date, s.role === 'Breakout' ? 'Breakout' : 'TTKB');
-            const reasonColor = s.reason === 'nghỉ' ? '#ef4444' : '#f59e0b';
-            const subBadge = sub
-              ? `<div class="um-sub-badge"><i class="fa-solid fa-circle-check"></i> GV tạm (${esc(s.role || 'TTKB')}): ${esc(sub.substitute_teacher_name || sub.substitute_teacher_email)}</div>`
-              : `<div class="um-no-sub-badge"><i class="fa-solid fa-circle-xmark"></i> Chưa có GV tạm</div>`;
-            return `
-            <div class="um-student ${cardClass}">
-              <div class="um-student-avatar">${esc(ini)}</div>
-              <div class="um-student-info">
-                <div class="um-student-name" style="cursor:pointer;text-decoration:underline;text-decoration-color:#6366f140;" onclick='openSubPicker(${JSON.stringify({
-                  studentEmail: s.student_email, studentName: s.student_name,
-                  originalTeacherEmail: s.teacher_email, originalTeacherName: s.teacher_name,
-                  reason: s.reason || "nghỉ", dateYMD: day.date,
-                  dateLabel: dayLabelsLong[dow] + " " + dd + "/" + mm, dayOfWeek: dow,
-                  timeLocal: (s.time_local || "").slice(0, 5),
-                  studentMinutes: s.student_minutes || 0, studentLevel: s.student_level || "",
-                  role: s.role || "TTKB"
-                }).replace(/'/g, "\\u0027")})'>${esc(s.student_name)}</div>
-                <div class="um-student-teacher">
-                  <i class="fa-solid fa-chalkboard-user"></i>
-                  GV: ${esc(s.teacher_name)} <span style="color:${reasonColor};font-weight:600">(${esc(s.reason || 'không có ca')})</span>
-                  <span style="margin-left:4px;padding:1px 6px;border-radius:4px;font-size:0.65rem;font-weight:700;background:${s.role === 'Breakout' ? '#ede9fe' : '#dbeafe'};color:${s.role === 'Breakout' ? '#7c3aed' : '#2563eb'};border:1px solid ${s.role === 'Breakout' ? '#c4b5fd' : '#bfdbfe'}">${esc(s.role || 'TTKB')}</span>
-                </div>
-                ${subBadge}
-              </div>
-              <span class="um-student-time">${esc(timeStr)}</span>
-            </div>`;
-          }
-
-          // Multi-role: compact pill badges
-          const teacherName = first.teacher_name;
-          const reason = first.reason || 'nghỉ';
-          const reasonColor = reason === 'nghỉ' ? '#ef4444' : '#f59e0b';
-
-          const rolePills = entries.map(s => {
-            const role = s.role === 'Breakout' ? 'Breakout' : 'TTKB';
-            const sub = getSubstituteForStudent(s.student_email, day.date, role);
-            const isBR = role === 'Breakout';
-            const dotColor = sub ? '#22c55e' : '#ef4444';
-            const pillBg = sub ? '#dcfce7' : (isBR ? '#ede9fe' : '#dbeafe');
-            const pillColor = sub ? '#15803d' : (isBR ? '#7c3aed' : '#2563eb');
-            const pillBorder = sub ? '#86efac' : (isBR ? '#c4b5fd' : '#bfdbfe');
-            const subName = sub ? esc(sub.substitute_teacher_name || sub.substitute_teacher_email).split(' ').pop() : '';
-
-            const pickerData = JSON.stringify({
-              studentEmail: s.student_email, studentName: s.student_name,
-              originalTeacherEmail: s.teacher_email, originalTeacherName: s.teacher_name,
-              reason: s.reason || "nghỉ", dateYMD: day.date,
-              dateLabel: dayLabelsLong[dow] + " " + dd + "/" + mm, dayOfWeek: dow,
-              timeLocal: (s.time_local || "").slice(0, 5),
-              studentMinutes: s.student_minutes || 0, studentLevel: s.student_level || "",
-              role: role
-            }).replace(/'/g, "\\u0027");
-
-            return `<span class="um-role-pill" onclick='openSubPicker(${pickerData})' style="background:${pillBg};color:${pillColor};border-color:${pillBorder}">${esc(role)} <span class="um-role-dot" style="background:${dotColor}"></span>${subName ? ` <span class="um-role-sub-name">${subName}</span>` : ''}</span>`;
-          }).join('');
-
-          return `
-            <div class="um-student ${cardClass}">
-              <div class="um-student-avatar">${esc(ini)}</div>
-              <div class="um-student-info">
-                <div class="um-student-name">${esc(first.student_name)}</div>
-                <div class="um-student-teacher">
-                  <i class="fa-solid fa-chalkboard-user"></i>
-                  GV: ${esc(teacherName)} <span style="color:${reasonColor};font-weight:600">(${esc(reason)})</span>
-                </div>
-                <div class="um-role-pills">${rolePills}</div>
-              </div>
-              <span class="um-student-time">${esc(timeStr)}</span>
-            </div>`;
-
-        }).join('');
-
-        daysHtml += `
-          <div class="um-day">
-            <div class="um-day-head">
-              <span class="um-day-dow">${dayLabelsLong[dow]}</span>
-              <span class="um-day-date">${dd}/${mm}</span>
-              <span class="um-day-count">${uniqueCount} HV</span>
-            </div>
-            ${studentItems}
-          </div>`;
-      }
-
-      bodyHtml = `<div class="ui-section-body">${daysHtml}</div>`;
-    }
-
-    const today = new Date();
-    const fromDate = addDays(today, 1);
-    const toDate = addDays(today, 14);
-    const dateRange = `${formatDDMM(fromDate)} → ${formatDDMM(toDate)}`;
-
-    content.innerHTML = `
-      <section class="ui-section">
-        <div class="ui-section-head">
-          <h2><i class="fa-solid fa-binoculars"></i> HV bị ảnh hưởng 2 tuần tới</h2>
-          <span style="font-size:0.82rem;font-weight:500;opacity:0.85">${dateRange}</span>
-          <span class="ui-section-badge">${allStudents.size} HV</span>
-          <i class="fa-solid fa-chevron-down ui-section-chevron"></i>
-        </div>
-        ${bodyHtml}
-      </section>`;
-
-    // Wire up collapse toggle
-    content.querySelector('.ui-section-head')?.addEventListener('click', () => {
-      content.querySelector('.ui-section')?.classList.toggle('collapsed');
-    });
-
-  } catch (e) {
-    content.innerHTML = `<div class="ot-loading"><span>Lỗi: ${esc(e.message)}</span></div>`;
-  }
+function oqToast(msg) {
+  let t = document.getElementById('oqToast');
+  if (!t) { t = document.createElement('div'); t.id = 'oqToast'; t.className = 'oq-toast'; document.body.appendChild(t); }
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.classList.remove('show'), 2600);
 }
 
+function oqConfirmBar() {
+  const body = document.getElementById('subPickerBody');
+  if (!body) return null;
+  let bar = document.getElementById('oqConfirmBar');
+  if (!bar) { bar = document.createElement('div'); bar.id = 'oqConfirmBar'; bar.className = 'oq-confirm'; }
+  body.prepend(bar);
+  const modal = document.getElementById('subPickerModal');
+  if (modal) modal.scrollTop = 0;
+  return bar;
+}
 
 // ========== TEMPORARY SUBSTITUTE TEACHER FEATURE ==========
 
 let existingSubstitutes = []; // loaded from DB
 
-async function loadExistingSubstitutes() {
+// tansinh sub-gate (9 Oct 2026, carried into offq v1): the login token for the
+// substitute calls. Harmless where the route is still open, required once it
+// checks a token.
+async function _subAuth() {
+  try {
+    const { data: { session } } = await client.auth.getSession();
+    return session ? { 'Authorization': 'Bearer ' + session.access_token } : {};
+  } catch (e) { return {}; }
+}
+
+// tansinh offq v1: takes a range. The queue passes -8 weeks .. +3 weeks so
+// that past days show their real assignments. Called with no arguments it
+// behaves like the old version (today .. +21 days).
+async function loadExistingSubstitutes(fromDate, toDate) {
   try {
     const today = new Date();
-    const fromDate = today.toISOString().split('T')[0];
-    // Load substitutes from today onwards (up to 3 weeks)
-    const toDate = new Date(today);
-    toDate.setDate(toDate.getDate() + 21);
-    const toDateStr = toDate.toISOString().split('T')[0];
-
-    const res = await fetch(`${_DO}/save-temp-substitute?from_date=${fromDate}&to_date=${toDateStr}`);
+    today.setHours(0, 0, 0, 0);
+    const from = fromDate || formatYMD(today);
+    const to = toDate || formatYMD(addDays(today, 21));
+    const res = await fetch(`${_DO}/save-temp-substitute?from_date=${from}&to_date=${to}`, { headers: await _subAuth() });
     const out = await res.json();
     if (res.ok && out.ok) {
       existingSubstitutes = out.assignments || [];
@@ -877,7 +720,7 @@ function openSubPicker(studentInfo) {
   `;
 
   // Check if already assigned
-  const existing = getSubstituteForStudent(studentInfo.studentEmail, studentInfo.dateYMD);
+  const existing = getSubstituteForStudent(studentInfo.studentEmail, studentInfo.dateYMD, studentInfo.role || 'TTKB');   // tansinh offq v1: by role
 
   body.innerHTML = '<div style="text-align:center;padding:30px;color:#9ca3af;"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải GV đang làm việc...</div>';
   overlay.style.display = 'block';
@@ -1134,7 +977,7 @@ async function fetchAndShowWorkingTeachers(studentInfo, existing) {
     const { data: { session } } = await client.auth.getSession();
     const res = await fetch(_DO + '/get-working-teachers-for-date', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(await _subAuth()) },   // tansinh offq v1: same token as the substitute calls
       body: JSON.stringify({
         date: studentInfo.dateYMD,
         student_time: studentInfo.timeLocal || '',
@@ -1246,65 +1089,76 @@ async function fetchAndShowWorkingTeachers(studentInfo, existing) {
 }
 
 async function assignSubstitute(info) {
-  if (!confirm(`Gán ${info.subName} phụ trách tạm cho ${info.studentName} ngày ${info.dateYMD}?`)) return;
-
-  try {
-    const res = await fetch(_DO + '/save-temp-substitute', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        student_email: info.studentEmail,
-        original_teacher_email: info.originalTeacherEmail,
-        substitute_teacher_email: info.subEmail,
-        assign_date: info.dateYMD,
-        day_of_week: info.dayOfWeek,
-        time_local: info.timeLocal,
-        student_name: info.studentName,
-        student_minutes: info.studentMinutes,
-        student_level: info.studentLevel,
-        original_teacher_name: info.originalTeacherName,
-        substitute_teacher_name: info.subName,
-        role: info.role || 'TTKB'
-      })
-    });
-    const out = await res.json();
-    if (!res.ok || !out.ok) throw new Error(out.error || 'Save failed');
-
-    alert('Đã gán GV phụ trách tạm thành công!');
-    closeSubPicker();
-
-    // Reload data to refresh badges
-    await loadExistingSubstitutes();
-    await loadUnmatchedStudents();
-    await loadUpcomingImpacted();
-  } catch (e) {
-    console.error(e);
-    alert('Lỗi: ' + e.message);
-  }
+  // tansinh offq v1: inline confirm inside the picker, no confirm()/alert(),
+  // and the page redraws in place afterwards (no column reload).
+  const bar = oqConfirmBar();
+  if (!bar) return;
+  bar.innerHTML = `<span>Gán <b>${esc(info.subName)}</b> phụ trách tạm <b>${esc(info.studentName)}</b> (${esc(info.role || 'TTKB')}) ngày ${oqFmtDMY(info.dateYMD)}?</span>
+    <span class="oq-confirm-btns"><button type="button" class="oq-btn" data-oq-confirm="no">Hủy</button><button type="button" class="oq-btn primary" data-oq-confirm="yes"><i class="fa-solid fa-check"></i> Gán</button></span>`;
+  bar.querySelector('[data-oq-confirm="no"]').onclick = () => bar.remove();
+  bar.querySelector('[data-oq-confirm="yes"]').onclick = async (ev) => {
+    const btn = ev.currentTarget;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang gán…';
+    try {
+      const res = await fetch(_DO + '/save-temp-substitute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await _subAuth()) },
+        body: JSON.stringify({
+          student_email: info.studentEmail,
+          original_teacher_email: info.originalTeacherEmail,
+          substitute_teacher_email: info.subEmail,
+          assign_date: info.dateYMD,
+          day_of_week: info.dayOfWeek,
+          time_local: info.timeLocal,
+          student_name: info.studentName,
+          student_minutes: info.studentMinutes,
+          student_level: info.studentLevel,
+          original_teacher_name: info.originalTeacherName,
+          substitute_teacher_name: info.subName,
+          role: info.role || 'TTKB'
+        })
+      });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok || !out.ok) throw new Error(out.error || 'Save failed');
+      closeSubPicker();
+      oqToast(`Đã gán ${info.subName} cho ${info.studentName}`);
+      await oqAfterChange();
+    } catch (e) {
+      console.error(e);
+      bar.innerHTML = `<span style="color:#b91c1c"><i class="fa-solid fa-triangle-exclamation"></i> Không gán được: ${esc(e.message)}</span><span class="oq-confirm-btns"><button type="button" class="oq-btn" data-oq-confirm="no">Đóng</button></span>`;
+      bar.querySelector('[data-oq-confirm="no"]').onclick = () => bar.remove();
+    }
+  };
 }
 
 async function removeSubstitute(id) {
-  if (!confirm('Xóa phân công tạm này?')) return;
-
-  try {
-    const res = await fetch(_DO + '/save-temp-substitute', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id })
-    });
-    const out = await res.json();
-    if (!res.ok || !out.ok) throw new Error(out.error || 'Delete failed');
-
-    alert('Đã xóa phân công tạm.');
-    closeSubPicker();
-
-    await loadExistingSubstitutes();
-    await loadUnmatchedStudents();
-    await loadUpcomingImpacted();
-  } catch (e) {
-    console.error(e);
-    alert('Lỗi: ' + e.message);
-  }
+  const bar = oqConfirmBar();
+  if (!bar) return;
+  bar.innerHTML = `<span>Xóa phân công tạm này?</span>
+    <span class="oq-confirm-btns"><button type="button" class="oq-btn" data-oq-confirm="no">Hủy</button><button type="button" class="oq-btn primary" style="background:#dc2626;border-color:#dc2626" data-oq-confirm="yes"><i class="fa-solid fa-trash"></i> Xóa</button></span>`;
+  bar.querySelector('[data-oq-confirm="no"]').onclick = () => bar.remove();
+  bar.querySelector('[data-oq-confirm="yes"]').onclick = async (ev) => {
+    const btn = ev.currentTarget;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xóa…';
+    try {
+      const res = await fetch(_DO + '/save-temp-substitute', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', ...(await _subAuth()) },
+        body: JSON.stringify({ id })
+      });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok || !out.ok) throw new Error(out.error || 'Delete failed');
+      closeSubPicker();
+      oqToast('Đã xóa phân công tạm');
+      await oqAfterChange();
+    } catch (e) {
+      console.error(e);
+      bar.innerHTML = `<span style="color:#b91c1c"><i class="fa-solid fa-triangle-exclamation"></i> Không xóa được: ${esc(e.message)}</span><span class="oq-confirm-btns"><button type="button" class="oq-btn" data-oq-confirm="no">Đóng</button></span>`;
+      bar.querySelector('[data-oq-confirm="no"]').onclick = () => bar.remove();
+    }
+  };
 }
 
 
