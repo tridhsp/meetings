@@ -4409,11 +4409,12 @@ body.app .fab--confirm {
 }
 
 /* --- Multi time-slot pill (grouped teacher) --- */
+/* tansinh roster-v1 (11 Oct 2026): a teacher with two shifts in one cell gets one row and one line
+   per shift, in the same grey as a single shift. The purple left border (the "(" shape) and the
+   purple time pills are gone, so the row no longer overflows. */
 .pill--multi {
-  border-left: 3px solid #6366f1;
+  border-left: 1px solid #eef2f7;
 }
-
-
 
 .pill__dept--inline {
   display: none;
@@ -4429,35 +4430,35 @@ body.app .fab--confirm {
   display: inline-flex;
 }
 
-.pill--multi:hover .pill__dept--inline {
-  display: inline-flex;
-}
-
 .pill--multi:hover .pill__time-slots {
-  display: none;
+  opacity: .35;
+  transition: opacity var(--transition);
 }
 .pill--multi:hover .pill__time {
   display: none;
 }
 
-
 .pill__time-slots {
   display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 2px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  margin-top: 0;
 }
 .pill__time-slot {
-  display: inline-block;
-  background: #f0f0ff;
-  color: #4338ca;
-  font-size: 0.72rem;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 10px;
-  border: 1px solid #c7d2fe;
+  display: block;
+  font-size: 12px;
+  color: #6b7280;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+/* the small per-line department badge, only when a teacher's shifts are in different departments */
+.pill__dept.pill__slot-dept {
+  font-size: 10px;
+  padding: 1px 6px;
+  margin-right: 6px;
+  font-style: normal;
+  vertical-align: 1px;
 }
 
 /* ========== Off Teachers Today Box ========== */
