@@ -2425,20 +2425,26 @@ function renderRoster(buckets) {
 
       html += `<div class="roster__cell ${dayClass}">` +
         teacherOrder.map(key => {
-          const group = teacherGroups[key];
+          // tansinh roster-v1 (11 Oct 2026): earliest shift first, so two shifts read top to bottom in time order
+          const group = teacherGroups[key].slice().sort((a, b) => minutesFromHHMM(String(a.start_time || '0:0')) - minutesFromHHMM(String(b.start_time || '0:0')));
           const r = group[0]; // first row for name/avatar/dept/actions
           const name = r.teacher_name || r.teacher_email || '(No name)';
           const initials = wmInitials(name);
           const isMulti = group.length > 1;
 
-          // Build time slots HTML
+          // Build time slots HTML. tansinh roster-v1: one line per shift, in the same grey as a single shift.
+          // A department is written on each line only when the shifts belong to different departments.
+          const mixedDepts = new Set(group.map(row => String(row.department || '').trim().toLowerCase())).size > 1;
           const timeSlotsHtml = group.map((row, idx) => {
             const time = `${wmTimeHHMM(row.start_time)}–${wmTimeHHMM(row.end_time)}${row.is_one_time ? '' : ' ↻'}`;
+            const slotDept = mixedDepts && row.department
+              ? `<i class="pill__dept pill__slot-dept ${wmDeptClass(row.department)}">${wmEscape(row.department)}</i>`
+              : ``;
             return `<span class="pill__time-slot"
               data-row-id="${row.id}"
               data-work-date="${row.work_date}"
               data-start-time="${String(row.start_time || '').slice(0, 5)}"
-              data-end-time="${String(row.end_time || '').slice(0, 5)}">${wmEscape(time)}</span>`;
+              data-end-time="${String(row.end_time || '').slice(0, 5)}">${slotDept}${wmEscape(time)}</span>`;
           }).join('');
 
           return `
@@ -2456,7 +2462,7 @@ function renderRoster(buckets) {
 <span class="pill__avatar">${wmEscape(initials)}</span>
 <span class="pill__name">${wmEscape(name)}</span>
 <span class="pill__meta">
-  ${!isMulti && r.department
+  ${r.department && !(isMulti && mixedDepts)
               ? `<span class="pill__dept ${wmDeptClass(r.department)}">${wmEscape(r.department)}</span>`
               : ``
             }
@@ -2474,7 +2480,7 @@ function renderRoster(buckets) {
               : ``
             }
   ${wmTiepHvIcon(r.teacher_email)}
-  ${wmIconLink(r.work_meeting, 'fa-briefcase', 'Open work meeting link')}
+  ${'' /* tansinh roster-v1 (11 Oct 2026): the "Work meeting" briefcase link was removed here. work_meeting stays in the database, untouched. */}
 
 ${(() => {
               const isSelf = (String(r.teacher_email || '').toLowerCase() === String(window.MY_EMAIL || '').toLowerCase());
@@ -2922,7 +2928,7 @@ document.addEventListener('click', async (e) => {
   const btn = e.target.closest('.pill__edit');
   if (!btn) return;
 
-  if (!window.CAN_EDIT) { showMsg('Báº¡n khÃ´ng cÃ³ quyá»n thao tÃ¡c.', 'error'); return; }
+  if (!window.CAN_EDIT) { showMsg('Bạn không có quyền thao tác.', 'error'); return; }
 
   const pill = btn.closest('.pill');
   const isMulti = pill?.classList.contains('pill--multi');
@@ -2966,7 +2972,7 @@ document.addEventListener('click', async (e) => {
   const btn = e.target.closest('.pill__delete');
   if (!btn) return;
 
-  if (!window.CAN_EDIT) { showMsg('Báº¡n khÃ´ng cÃ³ quyá»n thao tÃ¡c.', 'error'); return; }
+  if (!window.CAN_EDIT) { showMsg('Bạn không có quyền thao tác.', 'error'); return; }
 
   const pill = btn.closest('.pill');
   const isMulti = pill?.classList.contains('pill--multi');
