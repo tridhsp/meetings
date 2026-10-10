@@ -451,7 +451,7 @@ async function initRoleBasedFab(session) {
 
     // Only Admin / Super Admin get the + FABs
     if (allowed) {
-      setupFabModal();          // existing + button (left)
+      // tansinh watch-link v2: setupFabModal() is no longer called; the "Thêm meeting link" popup was removed on 10 Oct 2026.
       setupWorkingFabModal();   // working-meeting button (right)
       document.body.classList.add('has-add-fab'); // Add class so CSS can position confirm FAB higher
     } else {
@@ -497,49 +497,54 @@ function showLogin() {
 
 
 /* ---------- FAB + Modal ---------- */
-/* === tansinh add-link v1 BEGIN (10 Oct 2026) ===
-   "Thêm meeting link" rebuilt. The teacher's Tiếp HV room is read from
-   watch.tansinh.info (watch-teachers-list + watch-meetings-list) and the link
-   fills itself in. Breakout rooms are ignored on purpose. The "Meeting Work"
-   section is gone: the /addmeeting payload keeps its six keys, meetingWork and
-   meetingWorkLink are sent empty, and meetingHvLink carries the same URL as
-   meetingHv so the "Link gốc" chip on availablemeetings.html keeps working.
-   Undo: python3 patch-meetings-addlink.py undo <folder>  (restores byte for byte). */
-const AL_MEET_BASE = 'https://meeting.tansinh.info/';
-const AL_WATCH_CREATE_URL = 'https://watch.tansinh.info/meetings.html';
-const AL_GOC_SAME_AS_LINK = true; // false -> send meetingHvLink as ''
+/* === tansinh watch-link v2: the "Thêm meeting link" popup lived here until 10 Oct 2026.
+   Meeting links now come from watch.tansinh.info inside "Thêm ca làm việc" (below), so the
+   popup, its FAB and the meeting_links directory are no longer used by this page.
+   patch-meetings-watchlink.py undo puts the original block back byte for byte. === */
 
-function alEsc(s) {
+/* ---------- Working Meeting FAB + Popup ---------- */
+/* === tansinh watch-link v2 BEGIN (10 Oct 2026) ===
+   "Thêm ca làm việc" rebuilt. The teacher is searched by name or email in
+   watch.tansinh.info's list (/watch-teachers-list), and the meeting link is the
+   teacher's Tiếp HV room from /watch-meetings-list: https://meeting.tansinh.info/<room_name>.
+   Breakout rooms are ignored on purpose. The meeting_links directory and the
+   "Thêm meeting link" popup are no longer used. The Work_meeting field is gone:
+   /addworkmeeting and /editcalendar keep every payload key, workMeeting is sent
+   empty for a new shift and unchanged for an edited one.
+   Undo: python3 patch-meetings-watchlink.py undo <folder>  (restores byte for byte). */
+const WL_MEET_BASE = 'https://meeting.tansinh.info/';
+const WL_WATCH_CREATE_URL = 'https://watch.tansinh.info/meetings.html';
+
+function wlEsc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 }
-function alUsername(email) {
+function wlUsername(email) {
   return String(email || '').split('@')[0].trim().toLowerCase();
 }
-function alInitials(name, email) {
+function wlInitials(name, email) {
   const src = String(name || email || '').trim();
   if (!src) return 'GV';
   const parts = src.split(/\s+/).filter(Boolean);
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[parts.length - 2].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 }
-function alFmtDate(iso) {
+function wlFmtDate(iso) {
   if (!iso) return '';
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '';
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 // Group watch rooms by teacher email: the one Tiếp HV room, and how many breakouts.
-function alIndexRooms(rows) {
+function wlIndexRooms(rows) {
   const by = new Map();
   (Array.isArray(rows) ? rows : []).forEach(r => {
     const em = String(r && r.teacher_email || '').trim().toLowerCase();
     if (!em) return;
     const e = by.get(em) || { tiep: null, breakouts: 0 };
     const room = String(r.room_name || '');
-    const isTiep = r.meeting_type === 'tiep-hv' || (!r.meeting_type && room === alUsername(em));
+    const isTiep = r.meeting_type === 'tiep-hv' || (!r.meeting_type && room === wlUsername(em));
     if (isTiep) {
-      // Prefer the row whose name is the plain username; otherwise the first one seen.
-      if (!e.tiep || (room === alUsername(em) && e.tiep.room_name !== alUsername(em))) e.tiep = r;
+      if (!e.tiep || (room === wlUsername(em) && e.tiep.room_name !== wlUsername(em))) e.tiep = r;
     } else {
       e.breakouts += 1;
     }
@@ -547,87 +552,88 @@ function alIndexRooms(rows) {
   });
   return by;
 }
-function alInjectStyles() {
-  if (document.getElementById('tsAddLinkStyles')) return;
+function wlInjectStyles() {
+  if (document.getElementById('tsWatchLinkStyles')) return;
   const st = document.createElement('style');
-  st.id = 'tsAddLinkStyles';
+  st.id = 'tsWatchLinkStyles';
   st.textContent = `
-.al-modal .modal-header{align-items:flex-start}
-.al-modal [hidden]{display:none !important}
-.al-sub{margin:4px 0 0;font-size:12px;color:#6b7280;line-height:1.4}
-.al-searchwrap{position:relative}
-.al-searchwrap>i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#9ca3af;pointer-events:none;font-size:13px}
-.al-searchwrap .input{padding-left:34px}
-.al-sug .suggestion-item{justify-content:space-between;gap:12px}
-.al-sug .suggestion-item.active{background:#eef2ff}
-.al-sug-main{display:flex;flex-direction:column;min-width:0}
-.al-sug-name{font-weight:600;color:#111827}
-.al-sug-email{font-size:12px;color:#6b7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.al-pill{flex:none;font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;background:#f3f4f6;color:#6b7280}
-.al-pill.ok{background:#dcfce7;color:#166534}
-.al-teacher{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid #e5e7eb;border-radius:12px;margin-bottom:14px;background:#fff}
-.al-avatar{width:40px;height:40px;border-radius:50%;background:#e0ecff;color:#1d4ed8;font-weight:700;display:grid;place-items:center;flex:none}
-.al-who{min-width:0;flex:1}
-.al-name{font-weight:700;color:#111827}
-.al-email{font-size:12px;color:#6b7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.al-change{border:none;background:transparent;color:var(--primary);font-weight:600;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;white-space:nowrap}
-.al-change:hover{background:#f3f4f6}
-.al-room{padding:14px;border-radius:12px;background:#f8fafc;border:1px solid #e5e7eb}
-.al-room-head{font-size:12px;color:#6b7280;margin-bottom:8px}
-.al-status{display:flex;align-items:flex-start;gap:8px;font-size:14px;color:#111827;line-height:1.4}
-.al-dot{width:10px;height:10px;border-radius:50%;background:#9ca3af;margin-top:5px;flex:none}
-.al-status[data-state="ok"] .al-dot{background:#16a34a}
-.al-status[data-state="missing"] .al-dot{background:#f59e0b}
-.al-status[data-state="error"] .al-dot{background:#dc2626}
-.al-status[data-state="loading"] .al-dot{animation:al-pulse 1s ease-in-out infinite}
-@keyframes al-pulse{50%{opacity:.3}}
-@media (prefers-reduced-motion:reduce){.al-status[data-state="loading"] .al-dot{animation:none}}
-.al-status small{display:block;color:#6b7280;font-size:12px;margin-top:2px}
-.al-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 2px}
-.al-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;color:#374151;font-weight:600;font-size:13px;cursor:pointer;text-decoration:none;font-family:inherit}
-.al-btn:hover{background:#f9fafb;border-color:#d1d5db}
-.al-btn:focus-visible,.al-change:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
-.al-linklabel{display:block;font-size:12px;color:#6b7280;margin:12px 0 6px}
-.al-linkrow{display:flex;align-items:center;gap:6px}
-.al-linkrow .input{flex:1;min-width:0;font-size:13px;background:#fff}
-.al-linkrow .input[readonly]{color:#374151}
-.al-linkrow .icon-btn{display:inline-flex;flex:none;color:#6b7280}
-.al-manual{display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;margin-top:10px;cursor:pointer;user-select:none}
-.al-manual input{width:16px;height:16px;accent-color:var(--primary)}
-.al-dir{margin-top:10px}
-.al-dir strong{color:#374151;word-break:break-all}
+.wl-modal [hidden]{display:none !important}
+.wl-modal .modal-header{align-items:flex-start}
+.wl-sub{margin:4px 0 0;font-size:12px;color:#6b7280;line-height:1.4}
+.wl-searchwrap{position:relative}
+.wl-searchwrap>i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#9ca3af;pointer-events:none;font-size:13px}
+.wl-searchwrap .input{padding-left:34px}
+.wl-sug .suggestion-item{justify-content:space-between;gap:12px}
+.wl-sug .suggestion-item.active{background:#eef2ff}
+.wl-sug-main{display:flex;flex-direction:column;min-width:0}
+.wl-sug-name{font-weight:600;color:#111827}
+.wl-sug-email{font-size:12px;color:#6b7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wl-pill{flex:none;font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;background:#f3f4f6;color:#6b7280}
+.wl-pill.ok{background:#dcfce7;color:#166534}
+.wl-teacher{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid #e5e7eb;border-radius:12px;margin-bottom:12px;background:#fff}
+.wl-avatar{width:40px;height:40px;border-radius:50%;background:#e0ecff;color:#1d4ed8;font-weight:700;display:grid;place-items:center;flex:none}
+.wl-who{min-width:0;flex:1}
+.wl-name{font-weight:700;color:#111827}
+.wl-email{font-size:12px;color:#6b7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wl-change{border:none;background:transparent;color:var(--primary);font-weight:600;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;white-space:nowrap;font-family:inherit}
+.wl-change:hover{background:#f3f4f6}
+.wl-room{padding:12px 14px;border-radius:12px;background:#f8fafc;border:1px solid #e5e7eb;margin-bottom:14px}
+.wl-room-head{font-size:12px;color:#6b7280;margin-bottom:8px}
+.wl-status{display:flex;align-items:flex-start;gap:8px;font-size:14px;color:#111827;line-height:1.4}
+.wl-dot{width:10px;height:10px;border-radius:50%;background:#9ca3af;margin-top:5px;flex:none}
+.wl-status[data-state="ok"] .wl-dot{background:#16a34a}
+.wl-status[data-state="missing"] .wl-dot{background:#f59e0b}
+.wl-status[data-state="error"] .wl-dot{background:#dc2626}
+.wl-status[data-state="loading"] .wl-dot{animation:wl-pulse 1s ease-in-out infinite}
+@keyframes wl-pulse{50%{opacity:.3}}
+@media (prefers-reduced-motion:reduce){.wl-status[data-state="loading"] .wl-dot{animation:none}}
+.wl-status small{display:block;color:#6b7280;font-size:12px;margin-top:2px}
+.wl-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 2px}
+.wl-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;color:#374151;font-weight:600;font-size:13px;cursor:pointer;text-decoration:none;font-family:inherit}
+.wl-btn:hover{background:#f9fafb;border-color:#d1d5db}
+.wl-btn:focus-visible,.wl-change:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.wl-linklabel{display:block;font-size:12px;color:#6b7280;margin:12px 0 6px}
+.wl-linkrow{display:flex;align-items:center;gap:6px}
+.wl-linkrow .input{flex:1;min-width:0;font-size:13px;background:#fff}
+.wl-linkrow .input[readonly]{color:#374151}
+.wl-linkrow .icon-btn{display:inline-flex;flex:none;color:#6b7280}
+.wl-manual{display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;margin-top:10px;cursor:pointer;user-select:none}
+.wl-manual input{width:16px;height:16px;accent-color:var(--primary)}
+.wl-note{margin-top:10px}
+.wl-note strong{color:#374151;word-break:break-all}
+.wl-note button{margin-left:6px}
 `;
   document.head.appendChild(st);
 }
 
-function setupFabModal() {
-  // Create FAB if missing
-  let fab = document.getElementById('fabAdd');
+function setupWorkingFabModal() {
+  // 1) Create the right-side FAB if missing
+  let fab = document.getElementById('fabAddWorking');
   if (!fab) {
     fab = document.createElement('button');
-    fab.id = 'fabAdd';
-    fab.className = 'fab';
-    fab.title = 'Thêm meeting link';
-    fab.setAttribute('aria-label', 'Thêm meeting link');
-    fab.innerHTML = '<i class="fa-solid fa-plus" aria-hidden="true"></i>';
+    fab.id = 'fabAddWorking';
+    fab.className = 'fab fab--right';
+    fab.title = 'Thêm ca làm việc';
+    fab.setAttribute('aria-label', 'Thêm ca làm việc');
+    fab.innerHTML = '<i class="fa-solid fa-briefcase" aria-hidden="true"></i>';
     document.body.appendChild(fab);
   }
 
-  alInjectStyles();
+  wlInjectStyles();
 
-  // Create modal if missing
-  let modal = document.getElementById('fabModal');
+  // 2) Build modal UI
+  let modal = document.getElementById('workingModal');
   if (!modal) {
     modal = document.createElement('div');
-    modal.id = 'fabModal';
+    modal.id = 'workingModal';
     modal.className = 'modal';
     modal.setAttribute('aria-hidden', 'true');
     modal.innerHTML = `
-      <div class="modal-overlay" id="fabOverlay"></div>
+      <div class="modal-overlay" id="wmOverlay"></div>
 
-      <div class="modal-content al-modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-        <!-- Saving overlay (hidden by default) -->
-        <div id="savingOverlay" class="saving-overlay" hidden>
+      <div class="modal-content wl-modal" role="dialog" aria-modal="true" aria-labelledby="wmTitle">
+        <!-- Saving overlay -->
+        <div id="wmSaving" class="saving-overlay" hidden>
           <div class="saving-box">
             <div class="spinner"></div>
             <div class="saving-label">Đang lưu…</div>
@@ -636,120 +642,173 @@ function setupFabModal() {
 
         <div class="modal-header">
           <div>
-            <h3 id="modalTitle">Thêm meeting link</h3>
-            <p class="al-sub">Link lấy từ watch.tansinh.info. Chỉ dùng phòng Tiếp HV, không dùng phòng Breakout.</p>
+            <h3 id="wmTitle">Thêm ca làm việc</h3>
+            <p class="wl-sub">Meeting link lấy từ watch.tansinh.info. Chỉ dùng phòng Tiếp HV, không dùng phòng Breakout.</p>
           </div>
-          <button class="icon-btn" id="modalClose" aria-label="Đóng">
+          <button class="icon-btn" id="wmClose" aria-label="Đóng">
             <i class="fa-solid fa-xmark"></i>
           </button>
         </div>
 
         <div class="modal-body">
-          <div class="form-group" id="alPick">
-            <label for="alSearch">Giáo viên</label>
-            <div class="al-searchwrap">
+          <!-- Teacher: searched by name or email in watch.tansinh.info's list -->
+          <div class="form-group" id="wlPick">
+            <label for="wlSearch">Giáo viên</label>
+            <div class="wl-searchwrap">
               <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-              <input type="text" id="alSearch" class="input" placeholder="Gõ tên hoặc email để tìm" autocomplete="off" />
+              <input type="text" id="wlSearch" class="input" placeholder="Gõ tên hoặc email để tìm" autocomplete="off" />
             </div>
-            <div id="alSug" class="suggestions al-sug" role="listbox" aria-label="Danh sách giáo viên"></div>
-            <p class="hint" id="alPickHint">Đang tải danh sách giáo viên…</p>
+            <div id="wlSug" class="suggestions wl-sug" role="listbox" aria-label="Danh sách giáo viên"></div>
+            <p class="hint" id="wlPickHint">Đang tải danh sách giáo viên…</p>
           </div>
 
-          <div class="al-teacher" id="alTeacher" hidden>
-            <div class="al-avatar" id="alAvatar" aria-hidden="true">GV</div>
-            <div class="al-who">
-              <div class="al-name" id="alName"></div>
-              <div class="al-email" id="alEmail"></div>
+          <div class="wl-teacher" id="wlTeacher" hidden>
+            <div class="wl-avatar" id="wlAvatar" aria-hidden="true">GV</div>
+            <div class="wl-who">
+              <div class="wl-name" id="wlName"></div>
+              <div class="wl-email" id="wlEmail"></div>
             </div>
-            <button type="button" class="al-change" id="alChange">Chọn GV khác</button>
+            <button type="button" class="wl-change" id="wlChange">Chọn GV khác</button>
           </div>
 
-          <div class="al-room" id="alRoom" hidden>
-            <div class="al-room-head">Phòng Tiếp HV trên watch.tansinh.info</div>
-            <div class="al-status" id="alStatus" data-state="loading">
-              <span class="al-dot" aria-hidden="true"></span>
-              <span id="alStatusText">Đang kiểm tra…</span>
+          <!-- Meeting link: the teacher's Tiếp HV room on watch -->
+          <div class="wl-room" id="wlRoom" hidden>
+            <div class="wl-room-head">Phòng Tiếp HV trên watch.tansinh.info</div>
+            <div class="wl-status" id="wlStatus" data-state="loading">
+              <span class="wl-dot" aria-hidden="true"></span>
+              <span id="wlStatusText">Đang kiểm tra…</span>
             </div>
-            <div class="al-actions" id="alActions" hidden>
-              <a class="al-btn" id="alCreateLink" href="${AL_WATCH_CREATE_URL}" target="_blank" rel="noopener">
+            <div class="wl-actions" id="wlActions" hidden>
+              <a class="wl-btn" id="wlCreateLink" href="${WL_WATCH_CREATE_URL}" target="_blank" rel="noopener">
                 <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i> Tạo phòng trên watch
               </a>
-              <button type="button" class="al-btn" id="alRecheck">
+              <button type="button" class="wl-btn" id="wlRecheck">
                 <i class="fa-solid fa-rotate" aria-hidden="true"></i> Kiểm tra lại
               </button>
             </div>
-            <label for="alLink" class="al-linklabel">Link sẽ lưu</label>
-            <div class="al-linkrow">
-              <input type="url" id="alLink" class="input" inputmode="url" readonly placeholder="https://meeting.tansinh.info/…" />
-              <button type="button" class="icon-btn" id="alCopy" title="Sao chép link" aria-label="Sao chép link">
+            <label for="wmMeetingLink" class="wl-linklabel">Meeting link của ca này</label>
+            <div class="wl-linkrow">
+              <input type="url" id="wmMeetingLink" class="input" inputmode="url" readonly placeholder="https://meeting.tansinh.info/…" />
+              <button type="button" class="icon-btn" id="wlCopy" title="Sao chép link" aria-label="Sao chép link">
                 <i class="fa-regular fa-copy" aria-hidden="true"></i>
               </button>
-              <a class="icon-btn" id="alOpen" href="#" target="_blank" rel="noopener" title="Mở link" aria-label="Mở link">
+              <a class="icon-btn" id="wlOpen" href="#" target="_blank" rel="noopener" title="Mở link" aria-label="Mở link">
                 <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
               </a>
             </div>
-            <label class="al-manual"><input type="checkbox" id="alManual" /> Tự nhập hoặc sửa link</label>
-            <p class="hint al-dir" id="alDir" hidden></p>
+            <label class="wl-manual"><input type="checkbox" id="wlManual" /> Tự nhập link, hoặc để trống</label>
+            <p class="hint wl-note" id="wlNote" hidden></p>
+          </div>
+
+          <!-- Department -->
+          <div class="form-group">
+            <label for="wmDept">Bộ phận</label>
+            <select id="wmDept" class="input">
+              <option value="">— Chọn —</option>
+              <option value="TTKB">TTKB</option>
+              <option value="Breakout">Breakout</option>
+              <option value="BM">BM</option>
+              <option value="Supporter">Supporter</option>
+              <option value="Mix">Mix</option>
+            </select>
+          </div>
+
+          <!-- Working date + time -->
+          <div class="form-row-3">
+            <div class="form-group">
+              <label for="wmDate">Ngày làm việc</label>
+              <input type="date" id="wmDate" class="input" required />
+            </div>
+            <div class="form-group">
+              <label for="wmStart">Bắt đầu</label>
+              <input type="time" id="wmStart" class="input" required />
+            </div>
+            <div class="form-group">
+              <label for="wmEnd">Kết thúc</label>
+              <input type="time" id="wmEnd" class="input" required />
+            </div>
+          </div>
+
+          <!-- Repeat (weekly) -->
+          <div class="form-group">
+            <label class="section-title">Lặp lại</label>
+            <div class="switch-row">
+              <span>Lặp lại hàng tuần</span>
+              <label class="switch">
+                <input type="checkbox" id="wmRecurring" />
+                <span class="slider"></span>
+              </label>
+            </div>
+            <p class="hint">Bật = lặp lại mỗi tuần. Tắt = chỉ một lần.</p>
           </div>
         </div>
 
         <div class="modal-footer">
-          <button class="btn-ghost" id="modalCancel">Đóng</button>
-          <button class="btn-primary" id="modalSave" disabled>
-            <i class="fa-solid fa-floppy-disk"></i> Lưu link
+          <button class="btn-ghost" id="wmCancel">Đóng</button>
+          <button class="btn-primary" id="wmSave" disabled>
+            <i class="fa-solid fa-plus"></i> Thêm ca
           </button>
         </div>
-      </div>`;
-
+      </div>
+    `;
     document.body.appendChild(modal);
   }
 
-  if (modal.dataset.wired === 'true') return; // prevent double wiring
+  // Prevent wiring twice
+  if (modal.dataset.wired === 'true') return;
   modal.dataset.wired = 'true';
 
   const qs = (sel) => modal.querySelector(sel);
-  const overlay   = qs('#fabOverlay');
-  const closeBtn  = qs('#modalClose');
-  const cancelBtn = qs('#modalCancel');
-  const saveBtn   = qs('#modalSave');
-  const pickBox   = qs('#alPick');
-  const search    = qs('#alSearch');
-  const sugBox    = qs('#alSug');
-  const pickHint  = qs('#alPickHint');
-  const teacherBox = qs('#alTeacher');
-  const avatarEl  = qs('#alAvatar');
-  const nameEl    = qs('#alName');
-  const emailEl   = qs('#alEmail');
-  const changeBtn = qs('#alChange');
-  const roomBox   = qs('#alRoom');
-  const statusEl  = qs('#alStatus');
-  const statusTxt = qs('#alStatusText');
-  const actionsEl = qs('#alActions');
-  const recheckBtn = qs('#alRecheck');
-  const linkInput = qs('#alLink');
-  const copyBtn   = qs('#alCopy');
-  const openLink  = qs('#alOpen');
-  const manualChk = qs('#alManual');
-  const dirEl     = qs('#alDir');
+  const pickBox    = qs('#wlPick');
+  const search     = qs('#wlSearch');
+  const sugBox     = qs('#wlSug');
+  const pickHint   = qs('#wlPickHint');
+  const teacherBox = qs('#wlTeacher');
+  const avatarEl   = qs('#wlAvatar');
+  const nameEl     = qs('#wlName');
+  const emailEl    = qs('#wlEmail');
+  const changeBtn  = qs('#wlChange');
+  const roomBox    = qs('#wlRoom');
+  const statusEl   = qs('#wlStatus');
+  const statusTxt  = qs('#wlStatusText');
+  const actionsEl  = qs('#wlActions');
+  const recheckBtn = qs('#wlRecheck');
+  const linkInput  = qs('#wmMeetingLink');
+  const copyBtn    = qs('#wlCopy');
+  const openLink   = qs('#wlOpen');
+  const manualChk  = qs('#wlManual');
+  const noteEl     = qs('#wlNote');
+  const deptSelect = qs('#wmDept');
+  const dateInput  = qs('#wmDate');
+  const startInput = qs('#wmStart');
+  const endInput   = qs('#wmEnd');
+  const recChk     = qs('#wmRecurring');
+  const saveBtn    = qs('#wmSave');
+  const savingLay  = qs('#wmSaving');
+  const titleEl    = qs('#wmTitle');
+
+  const ADD_LABEL  = '<i class="fa-solid fa-plus"></i> Thêm ca';
+  const SAVE_LABEL = '<i class="fa-solid fa-floppy-disk"></i> Lưu';
 
   // --- state ---
   const st = {
     teachers: null, teachersErr: '',
     rooms: null, roomsErr: '', roomsBy: new Map(),
     email: '', name: '',
-    roomState: 'idle', computedLink: '',
+    roomState: 'idle', watchLink: '',
+    editId: '', editWorkMeeting: '',
     sug: [], active: -1,
     remoteTimer: null, loadSeq: 0,
   };
 
-  async function alToken() {
+  async function wlToken() {
     try {
       const { data: { session } } = await client.auth.getSession();
       return session && session.access_token || null;
     } catch { return null; }
   }
-  async function alGet(path) {
-    const token = await alToken();
+  async function wlGet(path) {
+    const token = await wlToken();
     if (!token) return { ok: false, status: 0, data: null, err: 'Chưa đăng nhập.' };
     try {
       const r = await fetch(_DO + path, { headers: { Authorization: 'Bearer ' + token } });
@@ -767,14 +826,14 @@ function setupFabModal() {
     if (cls === 'success') setTimeout(() => { if (msg.textContent === text) { msg.textContent = ''; msg.className = ''; } }, 1800);
   }
 
-  // --- load the two watch lists (teachers + rooms) ---
+  // --- the two watch lists: teachers and rooms ---
   async function loadWatch(which) {
     const seq = ++st.loadSeq;
     const wantT = which !== 'rooms';
     const wantR = which !== 'teachers';
     const [tRes, rRes] = await Promise.all([
-      wantT ? alGet('/watch-teachers-list') : Promise.resolve(null),
-      wantR ? alGet('/watch-meetings-list') : Promise.resolve(null),
+      wantT ? wlGet('/watch-teachers-list') : Promise.resolve(null),
+      wantR ? wlGet('/watch-meetings-list') : Promise.resolve(null),
     ]);
     if (seq !== st.loadSeq) return; // a newer load superseded this one
     if (tRes) {
@@ -782,14 +841,13 @@ function setupFabModal() {
       else { st.teachers = null; st.teachersErr = tRes.err || ('HTTP ' + tRes.status); }
     }
     if (rRes) {
-      if (rRes.ok && Array.isArray(rRes.data)) { st.rooms = rRes.data; st.roomsErr = ''; st.roomsBy = alIndexRooms(st.rooms); }
+      if (rRes.ok && Array.isArray(rRes.data)) { st.rooms = rRes.data; st.roomsErr = ''; st.roomsBy = wlIndexRooms(st.rooms); }
       else { st.rooms = null; st.roomsErr = rRes.err || ('HTTP ' + rRes.status); st.roomsBy = new Map(); }
     }
     updatePickHint();
     if (st.email) evalRoom();
-    if (search.value.trim() || document.activeElement === search) renderSug(filterTeachers(search.value.trim()));
+    if (!pickBox.hidden && (search.value.trim() || document.activeElement === search)) renderSug(filterTeachers(search.value.trim()));
   }
-
   function updatePickHint() {
     if (st.teachers) {
       pickHint.textContent = st.teachers.length + ' giáo viên. Gõ để lọc theo tên hoặc email.';
@@ -808,11 +866,11 @@ function setupFabModal() {
   function filterTeachers(q) {
     if (!st.teachers) return [];
     const query = q.toLowerCase();
-    const list = st.teachers
+    return st.teachers
       .filter(t => t && t.email)
       .filter(t => !query || String(t.full_name || '').toLowerCase().includes(query) || String(t.email).toLowerCase().includes(query))
-      .sort((a, b) => String(a.full_name || a.email).localeCompare(String(b.full_name || b.email), 'vi'));
-    return list.slice(0, 30);
+      .sort((a, b) => String(a.full_name || a.email).localeCompare(String(b.full_name || b.email), 'vi'))
+      .slice(0, 30);
   }
   function renderSug(list) {
     st.sug = Array.isArray(list) ? list : [];
@@ -825,11 +883,11 @@ function setupFabModal() {
     sugBox.innerHTML = st.sug.map((t) => {
       const ok = hasTiep(t.email);
       const pill = st.rooms
-        ? '<span class="al-pill ' + (ok ? 'ok' : '') + '">' + (ok ? 'Có phòng' : 'Chưa có phòng') + '</span>'
+        ? '<span class="wl-pill ' + (ok ? 'ok' : '') + '">' + (ok ? 'Có phòng' : 'Chưa có phòng') + '</span>'
         : '';
-      return '<div class="suggestion-item" role="option" data-email="' + alEsc(t.email) + '" data-name="' + alEsc(t.full_name || '') + '">'
-        + '<div class="al-sug-main"><span class="al-sug-name">' + alEsc(t.full_name || t.email) + '</span>'
-        + '<span class="al-sug-email">' + alEsc(t.email) + '</span></div>' + pill + '</div>';
+      return '<div class="suggestion-item" role="option" data-email="' + wlEsc(t.email) + '" data-name="' + wlEsc(t.full_name || '') + '">'
+        + '<div class="wl-sug-main"><span class="wl-sug-name">' + wlEsc(t.full_name || t.email) + '</span>'
+        + '<span class="wl-sug-email">' + wlEsc(t.email) + '</span></div>' + pill + '</div>';
     }).join('');
     sugBox.style.display = 'block';
   }
@@ -840,12 +898,12 @@ function setupFabModal() {
     items.forEach((el, k) => el.classList.toggle('active', k === st.active));
     items[st.active].scrollIntoView({ block: 'nearest' });
   }
-  // Fallback when watch-teachers-list is not readable: the old email search.
+  // Fallback when watch's teacher list is not readable: the old email search.
   function remoteSearch(q) {
     clearTimeout(st.remoteTimer);
     if (q.length < 3) { renderSug([]); return; }
     st.remoteTimer = setTimeout(async () => {
-      const res = await alGet('/teachers-search?q=' + encodeURIComponent(q));
+      const res = await wlGet('/teachers-search?q=' + encodeURIComponent(q));
       const emails = (res.ok && res.data && Array.isArray(res.data.suggestions)) ? res.data.suggestions : [];
       renderSug(emails.map(e => ({ email: e, full_name: '' })));
     }, 600);
@@ -881,7 +939,6 @@ function setupFabModal() {
     email = String(email || '').trim().toLowerCase();
     if (!email) return;
     renderSug([]);
-    dirInfo = null;
     st.email = email;
     st.name = name || '';
     if (!st.name && st.teachers) {
@@ -890,9 +947,8 @@ function setupFabModal() {
     }
     showTeacher();
     evalRoom();
-    loadDirectory(email);
     if (!st.name) {
-      const r = await alGet('/teacher-by-email?email=' + encodeURIComponent(email));
+      const r = await wlGet('/teacher-by-email?email=' + encodeURIComponent(email));
       if (r.ok && r.data && r.data.full_name && st.email === email) { st.name = r.data.full_name; showTeacher(); }
     }
   }
@@ -900,78 +956,76 @@ function setupFabModal() {
     pickBox.hidden = true;
     teacherBox.hidden = false;
     roomBox.hidden = false;
-    avatarEl.textContent = alInitials(st.name, st.email);
+    avatarEl.textContent = wlInitials(st.name, st.email);
     nameEl.textContent = st.name || '(chưa có tên)';
     emailEl.textContent = st.email;
   }
   function setStatus(state, text, small) {
     st.roomState = state;
     statusEl.dataset.state = state;
-    statusTxt.innerHTML = alEsc(text) + (small ? '<small>' + alEsc(small) + '</small>' : '');
+    statusTxt.innerHTML = wlEsc(text) + (small ? '<small>' + wlEsc(small) + '</small>' : '');
     actionsEl.hidden = !(state === 'missing' || state === 'error');
   }
+  // Decide what watch says about this teacher, and fill the link in.
   function evalRoom() {
     if (!st.email) return;
-    const username = alUsername(st.email);
+    const username = wlUsername(st.email);
     if (!st.rooms && !st.roomsErr) {
       setStatus('loading', 'Đang kiểm tra trên watch.tansinh.info…', '');
-      st.computedLink = AL_MEET_BASE + username;
+      st.watchLink = '';
     } else if (st.rooms) {
       const e = st.roomsBy.get(st.email);
       if (e && e.tiep) {
-        const when = alFmtDate(e.tiep.created_at);
+        const when = wlFmtDate(e.tiep.created_at);
         const extra = e.breakouts > 0 ? ('Có thêm ' + e.breakouts + ' phòng Breakout, không dùng ở đây.') : '';
         setStatus('ok', 'Đã có phòng Tiếp HV' + (when ? ', tạo ngày ' + when : '') + '.', extra);
-        st.computedLink = AL_MEET_BASE + String(e.tiep.room_name || username);
+        st.watchLink = WL_MEET_BASE + String(e.tiep.room_name || username);
       } else {
         setStatus('missing', 'Chưa có phòng Tiếp HV trên watch.tansinh.info.',
-          'Tạo phòng ở watch trước rồi bấm Kiểm tra lại. Hoặc tích "Tự nhập hoặc sửa link" để lưu link dự kiến bên dưới.');
-        st.computedLink = AL_MEET_BASE + username;
+          'Tạo phòng ở watch trước rồi bấm Kiểm tra lại. Hoặc tích "Tự nhập link, hoặc để trống" để thêm ca mà không có link từ watch.');
+        st.watchLink = '';
       }
     } else {
       setStatus('error', 'Không đọc được danh sách phòng từ watch.tansinh.info (' + st.roomsErr + ').',
-        'Thử lại, hoặc tích "Tự nhập hoặc sửa link" để lưu link dự kiến bên dưới.');
-      st.computedLink = AL_MEET_BASE + username;
+        'Thử lại, hoặc tích "Tự nhập link, hoặc để trống".');
+      st.watchLink = '';
     }
-    if (!manualChk.checked) linkInput.value = st.computedLink;
+    // A new shift takes the watch link. An edited shift keeps its own link until asked.
+    if (!manualChk.checked) {
+      if (!st.editId) linkInput.value = st.watchLink;
+      else if (!linkInput.value.trim() && st.watchLink) linkInput.value = st.watchLink;
+    }
     syncOpenLink();
+    updateNote();
     updateSave();
-    updateDirLine();
   }
   function syncOpenLink() {
     const v = linkInput.value.trim();
     if (/^https?:\/\//i.test(v)) { openLink.href = v; openLink.style.visibility = ''; }
     else { openLink.href = '#'; openLink.style.visibility = 'hidden'; }
   }
+  // In edit mode, say when the shift's stored link differs from the watch room.
+  function updateNote() {
+    if (!st.editId || !st.watchLink || !linkInput.value.trim() || linkInput.value.trim() === st.watchLink) {
+      noteEl.hidden = true; noteEl.innerHTML = ''; return;
+    }
+    noteEl.hidden = false;
+    noteEl.innerHTML = 'Ca này đang lưu một link khác với phòng trên watch: <strong>' + wlEsc(linkInput.value.trim()) + '</strong>.'
+      + '<button type="button" class="wl-btn" id="wlUseWatch">Dùng link từ watch</button>';
+    noteEl.querySelector('#wlUseWatch').addEventListener('click', () => {
+      linkInput.value = st.watchLink;
+      syncOpenLink(); updateNote(); updateSave();
+    });
+  }
   function updateSave() {
     const link = linkInput.value.trim();
-    const ok = !!st.email && !!link && (st.roomState === 'ok' || manualChk.checked);
+    let ok = !!st.email;
+    if (!st.editId) ok = ok && (st.roomState === 'ok' && !!link || manualChk.checked);
     saveBtn.disabled = !ok;
   }
 
-  // --- the existing directory (meeting_links): is this teacher already in it? ---
-  let dirInfo = null;
-  async function loadDirectory(email) {
-    dirInfo = null;
-    updateDirLine();
-    const r = await alGet('/meetinglink-by-email?email=' + encodeURIComponent(email));
-    if (st.email !== email) return;
-    dirInfo = (r.ok && r.data && r.data.link_meeting) ? { link: String(r.data.link_meeting).trim() } : { link: '' };
-    updateDirLine();
-  }
-  function updateDirLine() {
-    if (!dirInfo || !dirInfo.link) { dirEl.hidden = true; dirEl.innerHTML = ''; return; }
-    const cur = linkInput.value.trim();
-    dirEl.hidden = false;
-    if (dirInfo.link === cur) {
-      dirEl.innerHTML = 'Danh bạ meeting link đã có giáo viên này với đúng link này. Lưu lại không bắt buộc.';
-    } else {
-      dirEl.innerHTML = 'Danh bạ đang có link khác cho giáo viên này: <strong>' + alEsc(dirInfo.link) + '</strong>. Lưu để ghi link mới.';
-    }
-  }
-
   // --- controls ---
-  changeBtn.addEventListener('click', () => { resetForm(); search.focus(); });
+  changeBtn.addEventListener('click', () => { clearTeacher(); search.focus(); });
   recheckBtn.addEventListener('click', async () => {
     recheckBtn.disabled = true;
     setStatus('loading', 'Đang kiểm tra lại…', '');
@@ -981,11 +1035,10 @@ function setupFabModal() {
   manualChk.addEventListener('change', () => {
     linkInput.readOnly = !manualChk.checked;
     if (manualChk.checked) linkInput.focus();
-    else { linkInput.value = st.computedLink; syncOpenLink(); }
-    updateSave();
-    updateDirLine();
+    else { linkInput.value = st.watchLink || (st.editId ? linkInput.value : ''); syncOpenLink(); }
+    updateNote(); updateSave();
   });
-  linkInput.addEventListener('input', () => { syncOpenLink(); updateSave(); updateDirLine(); });
+  linkInput.addEventListener('input', () => { syncOpenLink(); updateNote(); updateSave(); });
   copyBtn.addEventListener('click', async () => {
     const v = linkInput.value.trim();
     if (!v) return;
@@ -996,9 +1049,8 @@ function setupFabModal() {
     } catch { linkInput.select(); }
   });
 
-  function resetForm() {
-    st.email = ''; st.name = ''; st.roomState = 'idle'; st.computedLink = '';
-    dirInfo = null;
+  function clearTeacher() {
+    st.email = ''; st.name = ''; st.roomState = 'idle'; st.watchLink = '';
     search.value = '';
     renderSug([]);
     pickBox.hidden = false;
@@ -1007,43 +1059,81 @@ function setupFabModal() {
     manualChk.checked = false;
     linkInput.readOnly = true;
     linkInput.value = '';
-    dirEl.hidden = true; dirEl.innerHTML = '';
+    noteEl.hidden = true; noteEl.innerHTML = '';
     setStatus('loading', 'Đang kiểm tra…', '');
     updateSave();
   }
+  function resetForm() {
+    clearTeacher();
+    st.editId = ''; st.editWorkMeeting = '';
+    titleEl.textContent = 'Thêm ca làm việc';
+    saveBtn.innerHTML = ADD_LABEL;
+    // Prefill date/time nicely
+    if (!dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
+    if (!startInput.value) startInput.value = '09:00';
+    if (!endInput.value) endInput.value = '10:00';
+  }
 
+  // 3) Open / close. The sidebar button and the edit button add the "show"
+  //    class directly, so react to the class change rather than to open() only.
   const open = () => { modal.classList.add('show'); modal.setAttribute('aria-hidden', 'false'); };
   const close = () => { modal.classList.remove('show'); modal.setAttribute('aria-hidden', 'true'); };
 
-  // The sidebar button opens this modal by adding the "show" class directly,
-  // so react to the class change rather than to our own open() only.
   new MutationObserver(() => {
     const shown = modal.classList.contains('show');
     if (shown && modal.dataset.open !== '1') {
       modal.dataset.open = '1';
-      resetForm();
+      if (!st.editId) { resetForm(); setTimeout(() => search.focus(), 30); }
       updatePickHint();
       loadWatch('both');
-      setTimeout(() => search.focus(), 30);
     } else if (!shown && modal.dataset.open === '1') {
       modal.dataset.open = '0';
       clearTimeout(st.remoteTimer);
       renderSug([]);
+      // leave the modal clean for the next open: edit state ends with the modal
+      st.editId = ''; st.editWorkMeeting = '';
+      titleEl.textContent = 'Thêm ca làm việc';
+      saveBtn.innerHTML = ADD_LABEL;
     }
   }).observe(modal, { attributes: true, attributeFilter: ['class'] });
 
+  // Reuse this modal to edit an existing shift (called from the list's edit button)
+  window.openWorkMeetingModalInEditMode = (row) => {
+    resetForm();
+    st.editId = String(row.id || '');
+    st.editWorkMeeting = row.work_meeting || '';   // kept as it was, never shown, never wiped
+
+    st.email = String(row.teacher_email || '').trim().toLowerCase();
+    st.name = row.teacher_name || '';
+    if (st.email) {
+      showTeacher();
+      linkInput.value = row.meeting_link || '';
+      syncOpenLink();
+      evalRoom();   // shows what watch says; fills the link only if the row has none
+    }
+
+    dateInput.value = row.work_date || '';
+    startInput.value = String(row.start_time || '').slice(0, 5);
+    endInput.value = String(row.end_time || '').slice(0, 5);
+    if (deptSelect) deptSelect.value = row.department || '';
+    if (recChk) recChk.checked = !row.is_one_time;
+
+    titleEl.textContent = 'Sửa ca làm việc';
+    saveBtn.innerHTML = SAVE_LABEL;
+    updateSave();
+
+    modal.classList.add('show');
+    modal.setAttribute('aria-hidden', 'false');
+  };
+
   fab.addEventListener('click', async () => {
-    const verified = await askSecurityKey('add a meeting');
+    const verified = await askSecurityKey('add a work meeting');
     if (!verified) return;
     open();
   });
-
-  overlay.addEventListener('click', close);
-  closeBtn.addEventListener('click', close);
-  cancelBtn.addEventListener('click', close);
-
-  // ESC to close
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  qs('#wmOverlay').addEventListener('click', close);
+  qs('#wmClose').addEventListener('click', close);
+  qs('#wmCancel').addEventListener('click', close);
 
   // Close suggestions when clicking outside the content area
   modal.addEventListener('click', (ev) => {
@@ -1051,377 +1141,31 @@ function setupFabModal() {
     if (!inside) renderSug([]);
   });
 
-  // --- save: same /addmeeting payload shape as before, Meeting Work sent empty ---
-  saveBtn.addEventListener('click', async () => {
-    const savingOverlay = document.getElementById('savingOverlay');
-    const link = linkInput.value.trim();
-    if (!st.email || !link) return;
-
-    saveBtn.disabled = true;
-    savingOverlay?.removeAttribute('hidden');
-
-    try {
-      const data = {
-        teacherEmail: st.email,
-        teacherName: st.name || '',
-        meetingHv: link,
-        meetingHvLink: AL_GOC_SAME_AS_LINK ? link : '',
-        meetingWork: '',
-        meetingWorkLink: '',
-      };
-
-      const token = await alToken();
-      if (!token) throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
-
-      const res = await fetch(_DO + '/addmeeting', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify(data)
-      });
-
-      const out = await res.json().catch(() => ({}));
-      if (!res.ok || !out?.ok) {
-        throw new Error(out?.error || res.statusText || 'Lưu thất bại');
-      }
-
-      close();
-      flash('Đã lưu meeting link.', 'success');
-      loadWorkMeetings(); // refresh list on the main page
-    } catch (err) {
-      flash(String(err?.message || err), 'error');
-    } finally {
-      savingOverlay?.setAttribute('hidden', '');
-      updateSave();
-    }
-  });
-}
-/* === tansinh add-link v1 END === */
-
-/* ---------- Working Meeting FAB + Popup ---------- */
-/* ---------- Working Meeting FAB + Popup (enhanced) ---------- */
-function setupWorkingFabModal() {
-  // 1) Create the right-side FAB if missing
-  let fab = document.getElementById('fabAddWorking');
-  if (!fab) {
-    fab = document.createElement('button');
-    fab.id = 'fabAddWorking';
-    fab.className = 'fab fab--right';
-    fab.title = 'Add working meeting';
-    fab.setAttribute('aria-label', 'Add working meeting');
-    fab.innerHTML = '<i class="fa-solid fa-briefcase" aria-hidden="true"></i>';
-    document.body.appendChild(fab);
-  }
-
-  // 2) Build modal UI
-  let modal = document.getElementById('workingModal');
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'workingModal';
-    modal.className = 'modal';
-    modal.setAttribute('aria-hidden', 'true');
-    modal.innerHTML = `
-      <div class="modal-overlay" id="wmOverlay"></div>
-
-      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="wmTitle">
-        <!-- Saving overlay -->
-        <div id="wmSaving" class="saving-overlay" hidden>
-          <div class="saving-box">
-            <div class="spinner"></div>
-            <div class="saving-label">Đang lưu…</div>
-          </div>
-        </div>
-
-        <div class="modal-header">
-          <h3 id="wmTitle">Add work meeting</h3>
-          <button class="icon-btn" id="wmClose" aria-label="Close">
-            <i class="fa-solid fa-xmark"></i>
-          </button>
-        </div>
-
-        <div class="modal-body">
-          <!-- Teacher Email (typeahead ≥4 chars, 1s debounce) -->
-          <div class="form-group">
-            <label for="wmEmail">Teacher Email</label>
-            <input type="email" id="wmEmail" class="input" placeholder="Type at least 4 characters…" autocomplete="off" />
-            <div id="wmEmailSug" class="suggestions" role="listbox" aria-label="Email suggestions"></div>
-            <p class="hint">Start typing (≥ 4 chars). Suggestions appear after 1s.</p>
-          </div>
-
-          <!-- Tên GV (auto-filled from meeting_links.teacher_name) -->
-          <div class="form-group">
-            <label for="wmName">Tên GV</label>
-            <input type="text" id="wmName" class="input" placeholder="Auto-filled" readonly />
-          </div>
-
-          <!-- Meeting link (auto-filled from meeting_links.link_meeting) -->
-          <div class="form-group">
-            <label for="wmMeetingLink">Meeting link</label>
-            <input type="url" id="wmMeetingLink" class="input" placeholder="Auto-filled (editable)" inputmode="url" />
-          </div>
-
-          <!-- Work_meeting (auto-filled from meeting_links.link_work_meeting) -->
-          <div class="form-group">
-            <label for="wmWorkMeeting">Work_meeting</label>
-<input type="url" id="wmWorkMeeting" class="input" placeholder="Auto-filled (editable)" inputmode="url" />
-</div>
-
-<!-- Department -->
-<div class="form-group">
-  <label for="wmDept">Department</label>
-  <select id="wmDept" class="input">
-    <option value="">— Select —</option>
-    <option value="TTKB">TTKB</option>
-    <option value="Breakout">Breakout</option>
-    <option value="BM">BM</option>
-    <option value="Supporter">Supporter</option>
-    <option value="Mix">Mix</option>
-  </select>
-</div>
-
-<!-- Working date + time -->
-<div class="form-row-3">
-  <div class="form-group">
-    <label for="wmDate">Working date</label>
-    <input type="date" id="wmDate" class="input" required />
-  </div>
-  <div class="form-group">
-    <label for="wmStart">Start time</label>
-    <input type="time" id="wmStart" class="input" required />
-  </div>
-  <div class="form-group">
-    <label for="wmEnd">End time</label>
-    <input type="time" id="wmEnd" class="input" required />
-  </div>
-</div>
-
-<!-- Repeat (weekly) -->
-<div class="form-group">
-  <label class="section-title">Repeat</label>
-  <div class="switch-row">
-    <span>Recurring (weekly)</span>
-    <label class="switch">
-      <input type="checkbox" id="wmRecurring" />
-      <span class="slider"></span>
-    </label>
-  </div>
-  <p class="hint">Turn on to repeat weekly. Off = one-time.</p>
-</div>
-
-
-<div class="modal-footer">
-  <button class="btn-ghost" id="wmCancel">Close</button>
-  <button class="btn-primary" id="wmSave">
-    <i class="fa-solid fa-floppy-disk"></i> Add
-  </button>
-</div>
-
-      </div>
-    `;
-    document.body.appendChild(modal);
-  }
-
-  // Prevent wiring twice
-  if (modal.dataset.wired === 'true') return;
-
-  // 3) Wire up open/close
-  const open = () => {
-    modal.classList.add('show');
-    modal.setAttribute('aria-hidden', 'false');
-    emailInput?.focus();
-
-    // Prefill date/time nicely
-    const d = modal.querySelector('#wmDate');
-    const s = modal.querySelector('#wmStart');
-    const e = modal.querySelector('#wmEnd');
-    if (d && !d.value) d.value = new Date().toISOString().slice(0, 10);
-    if (s && !s.value) s.value = '09:00';
-    if (e && !e.value) e.value = '10:00';
-
-  };
-  const close = () => {
-    modal.classList.remove('show');
-    modal.setAttribute('aria-hidden', 'true');
-    clearTimeout(debounceId);
-    renderSuggestions([]);
-
-    // reset edit state back to default "Add"
-    delete modal.dataset.editId;
-    modal.querySelector('#wmTitle').textContent = 'Add work meeting';
-    saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Add';
-  };
-
-
-  fab.addEventListener('click', async () => {
-    const verified = await askSecurityKey('add a work meeting');
-    if (!verified) return;
-    open();
-  });
-  modal.querySelector('#wmOverlay').addEventListener('click', close);
-  modal.querySelector('#wmClose').addEventListener('click', close);
-  modal.querySelector('#wmCancel').addEventListener('click', close);
-
-  // 4) Elements + helpers
-  const emailInput = modal.querySelector('#wmEmail');
-  const nameInput = modal.querySelector('#wmName');
-  const meetInput = modal.querySelector('#wmMeetingLink');
-  const workInput = modal.querySelector('#wmWorkMeeting');
-  const sugBox = modal.querySelector('#wmEmailSug');
-  const saveBtn = modal.querySelector('#wmSave');
-  const savingLay = modal.querySelector('#wmSaving');
-  const deptSelect = modal.querySelector('#wmDept');
-
-
-  // Reuse the "Add work meeting" modal to edit an existing row
-  window.openWorkMeetingModalInEditMode = (row) => {
-    // tag modal as "editing"
-    modal.dataset.editId = row.id;
-
-    // prefill fields
-    emailInput.value = row.teacher_email || '';
-    nameInput.value = row.teacher_name || '';
-    meetInput.value = row.meeting_link || '';
-    workInput.value = row.work_meeting || '';
-
-    modal.querySelector('#wmDate').value = row.work_date || '';
-    modal.querySelector('#wmStart').value = String(row.start_time || '').slice(0, 5);
-    modal.querySelector('#wmEnd').value = String(row.end_time || '').slice(0, 5);
-
-    if (deptSelect) deptSelect.value = row.department || '';
-
-    const rec = modal.querySelector('#wmRecurring');
-    if (rec) rec.checked = !row.is_one_time;
-
-    // tweak UI labels for edit mode
-    modal.querySelector('#wmTitle').textContent = 'Edit work meeting';
-    saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save';
-
-    // show the modal
-    modal.classList.add('show');
-    modal.setAttribute('aria-hidden', 'false');
-  };
-
-
-  let debounceId;
-
-  function renderSuggestions(list) {
-    if (!Array.isArray(list) || list.length === 0) {
-      sugBox.innerHTML = '';
-      sugBox.style.display = 'none';
-      return;
-    }
-    sugBox.innerHTML = list.map(email => `
-      <div class="suggestion-item" role="option" data-email="${email}">
-        <i class="fa-solid fa-user"></i> ${email}
-      </div>`).join('');
-    sugBox.style.display = 'block';
-  }
-
-  async function authToken() {
-    const { data: { session } } = await client.auth.getSession();
-    return session?.access_token || null;
-  }
-
-  // 5) Debounced (1s) suggestions from meeting_links.teacher_email
-  emailInput.addEventListener('input', () => {
-    const q = emailInput.value.trim();
-    clearTimeout(debounceId);
-
-    if (q.length < 4) {
-      renderSuggestions([]);
-      return;
-    }
-
-    debounceId = setTimeout(async () => {
-      try {
-        const token = await authToken();
-        if (!token) return renderSuggestions([]);
-        const res = await fetch(`${_DO}/meetinglinks-search?q=${encodeURIComponent(q)}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!res.ok) return renderSuggestions([]);
-        const { suggestions } = await res.json();
-        renderSuggestions(suggestions || []);
-      } catch {
-        renderSuggestions([]);
-      }
-    }, 1000);
-  });
-
-  // 6) Choose suggestion → fill + fetch details (name/links)
-  sugBox.addEventListener('click', async (e) => {
-    const item = e.target.closest('.suggestion-item');
-    if (!item) return;
-    const email = item.dataset.email;
-    emailInput.value = email;
-    renderSuggestions([]);
-
-    try {
-      const token = await authToken();
-      if (!token) return;
-      const r = await fetch(`${_DO}/meetinglink-by-email?email=${encodeURIComponent(email)}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!r.ok) return;
-      const { teacher_name, link_meeting, link_work_meeting } = await r.json();
-      nameInput.value = teacher_name || '';
-      meetInput.value = link_meeting || '';
-      workInput.value = link_work_meeting || '';
-    } catch { /* ignore */ }
-  });
-
-  // 7) If user types full email and leaves field, try to fetch details
-  emailInput.addEventListener('blur', async () => {
-    const email = emailInput.value.trim();
-    if (!email || !email.includes('@')) return;
-    try {
-      const token = await authToken();
-      if (!token) return;
-      const r = await fetch(`${_DO}/meetinglink-by-email?email=${encodeURIComponent(email)}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!r.ok) return;
-      const { teacher_name, link_meeting, link_work_meeting } = await r.json();
-      nameInput.value = teacher_name || '';
-      meetInput.value = link_meeting || '';
-      workInput.value = link_work_meeting || '';
-    } catch { /* ignore */ }
-  });
-
-  // Close suggestions when clicking outside the content area
-  modal.addEventListener('click', (ev) => {
-    const inside = ev.target.closest('.modal-content');
-    if (!inside) renderSuggestions([]);
-  });
-
   // ESC to close
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
 
-  // 8) Save → call serverless addworkmeeting
+  // 4) Save → /addworkmeeting, or /editcalendar in edit mode. Same payload keys as before.
   saveBtn.addEventListener('click', async () => {
-    const isRecurring = !!modal.querySelector('#wmRecurring')?.checked;
+    const isRecurring = !!recChk?.checked;
 
     const payload = {
-      teacherEmail: emailInput.value.trim(),
-      teacherName: nameInput.value.trim(),
-      meetingLink: meetInput.value.trim(),
-      workMeeting: workInput.value.trim(),
-      workDate: modal.querySelector('#wmDate').value,   // YYYY-MM-DD
-      startTime: modal.querySelector('#wmStart').value,  // HH:MM
-      endTime: modal.querySelector('#wmEnd').value,    // HH:MM
+      teacherEmail: st.email,
+      teacherName: st.name || '',
+      meetingLink: linkInput.value.trim(),
+      workMeeting: st.editId ? st.editWorkMeeting : '',
+      workDate: dateInput.value,    // YYYY-MM-DD
+      startTime: startInput.value,  // HH:MM
+      endTime: endInput.value,      // HH:MM
       isOneTime: !isRecurring,
       department: (deptSelect?.value || '').trim(),
-
     };
 
-
-
-
-    if (!payload.teacherEmail) return showMsg('Please choose a teacher email first.', 'error');
+    if (!payload.teacherEmail) return showMsg('Vui lòng chọn giáo viên trước.', 'error');
     if (!payload.workDate || !payload.startTime || !payload.endTime) {
-      return showMsg('Please choose date, start time and end time.', 'error');
+      return showMsg('Vui lòng chọn ngày, giờ bắt đầu và giờ kết thúc.', 'error');
     }
     if (payload.startTime >= payload.endTime) {
-      return showMsg('End time must be later than start time.', 'error');
+      return showMsg('Giờ kết thúc phải sau giờ bắt đầu.', 'error');
     }
 
     const confirmMsg = isRecurring
@@ -1434,41 +1178,30 @@ function setupWorkingFabModal() {
     saveBtn.disabled = false;
     if (!ok) return;
 
-
-
-    if (!payload.teacherEmail) {
-      const msg = document.getElementById('message');
-      if (msg) { msg.textContent = 'Please choose a teacher email first.'; msg.className = 'error'; }
-      return;
-    }
-
     try {
       saveBtn.disabled = true;
       savingLay?.removeAttribute('hidden');
 
-      const token = await authToken();
-      if (!token) throw new Error('No session. Please log in again.');
+      const token = await wlToken();
+      if (!token) throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
 
       let endpoint = _DO + '/addworkmeeting';
       let method = 'POST';
-      if (modal.dataset.editId) {
+      if (st.editId) {
         // edit mode → send id and switch to editcalendar
-        payload.id = modal.dataset.editId;
+        payload.id = st.editId;
         endpoint = _DO + '/editcalendar';
         method = 'PUT';
       }
 
-      const res = await fetch(endpoint, {
+      const send = (body) => fetch(endpoint, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(body)
       });
 
-
-const out = await res.json().catch(() => ({}));
+      const res = await send(payload);
+      const out = await res.json().catch(() => ({}));
 
       // --- Handle overlap warning ---
       if (out?.overlap && out?.conflicts?.length) {
@@ -1480,49 +1213,29 @@ const out = await res.json().catch(() => ({}));
         saveBtn.disabled = true;
         savingLay?.removeAttribute('hidden');
         payload.forceOverlap = true;
-        const res2 = await fetch(endpoint, {
-          method,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(payload)
-        });
+        const res2 = await send(payload);
         const out2 = await res2.json().catch(() => ({}));
-        if (!res2.ok || !out2?.ok) throw new Error(out2?.error || 'Save failed');
+        if (!res2.ok || !out2?.ok) throw new Error(out2?.error || 'Lưu thất bại');
         close();
-        const msg2 = document.getElementById('message');
-        if (msg2) {
-          msg2.textContent = 'Saved!';
-          msg2.className = 'success';
-          setTimeout(() => { msg2.textContent = ''; msg2.className = ''; }, 1400);
-          loadWorkMeetings();
-        }
+        flash('Đã lưu ca làm việc.', 'success');
+        loadWorkMeetings();
         return;
       }
 
-      if (!res.ok || !out?.ok) throw new Error(out?.error || 'Save failed');
+      if (!res.ok || !out?.ok) throw new Error(out?.error || 'Lưu thất bại');
 
       close();
-      const msg = document.getElementById('message');
-      if (msg) {
-        msg.textContent = 'Saved!';
-        msg.className = 'success';
-        setTimeout(() => { msg.textContent = ''; msg.className = ''; }, 1400);
-        loadWorkMeetings(); // refresh list on the main page
-      }
+      flash('Đã lưu ca làm việc.', 'success');
+      loadWorkMeetings(); // refresh list on the main page
     } catch (err) {
-      const msg = document.getElementById('message');
-      if (msg) { msg.textContent = String(err?.message || err); msg.className = 'error'; }
+      flash(String(err?.message || err), 'error');
     } finally {
       savingLay?.setAttribute('hidden', '');
-      saveBtn.disabled = false;
+      updateSave();
     }
   });
-
-  modal.dataset.wired = 'true';
-
 }
+/* === tansinh watch-link v2 END === */
 
 
 function showMsg(text, type) {
@@ -4348,18 +4061,7 @@ function setupSidebar() {
     }
   });
 
-  // Sidebar Add Meeting button (Admin only)
-  const addMeetingBtn = document.getElementById('sidebarAddMeeting');
-  addMeetingBtn?.addEventListener('click', async () => {
-    closeSidebar();
-    const verified = await askSecurityKey('add a work meeting');
-    if (!verified) return;
-    const modal = document.getElementById('fabModal');
-    if (modal) {
-      modal.classList.add('show');
-      modal.setAttribute('aria-hidden', 'false');
-    }
-  });
+  // tansinh watch-link v2: the sidebar "Thêm meeting link" button and its handler were removed on 10 Oct 2026.
 
   // Sidebar Add Working button (Admin only)
   const addWorkingBtn = document.getElementById('sidebarAddWorking');
