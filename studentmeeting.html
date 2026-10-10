@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="style.css?v=20261010_sb1" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.4/dist/umd/supabase.js" defer></script>
- <script src="studentmeeting.js?v=20261010_smv2" defer></script>
+ <script src="studentmeeting.js?v=20261010_smv3" defer></script>
 <script>window.addEventListener('pageshow', function(e) { if (e.persisted) location.reload(); });</script>
 
 
@@ -298,53 +298,105 @@
 }
 
 
-/* === tansinh sm-v2 BEGIN (10 Oct 2026) — "Vào lớp với ai?" layout === */
+/* === tansinh sm-v3 BEGIN (10 Oct 2026) — week agenda ("Vào lớp với ai?") === */
 
-/* 5 columns now: Ngày | Giờ học | Ghi chú | Vào lớp với ai? | Meeting khác */
+/* the old grid wrapper becomes a plain container */
 #studentMeetingRoot .roster {
-  grid-template-columns: 90px 90px 110px minmax(360px, 1.5fr) minmax(280px, 1fr);
+  display: block;
+  grid-template-columns: none;
+  border: none;
+  box-shadow: none;
+  overflow: visible;
+  border-radius: 0;
+  background: transparent;
 }
-@media (max-width: 720px) {
-  #studentMeetingRoot .roster {
-    grid-template-columns: 72px 88px 110px minmax(300px, 1.4fr) minmax(240px, 1fr);
-  }
-}
-/* the old 6-column border trick no longer lines up; the last cell removes its own border */
-#studentMeetingRoot .roster__cell:nth-child(6n) { border-right: 1px solid #f1f5f9; }
-#studentMeetingRoot .roster__cell.roster__cell--other { border-right: none; }
+#studentMeetingRoot .section-title { margin-bottom: 6px; }
 
-/* the two answer cells: content fills the width and starts at the top */
-#studentMeetingRoot .roster__cell.roster__cell--main,
-#studentMeetingRoot .roster__cell.roster__cell--other {
-  align-items: stretch;
-  justify-content: flex-start;
-  padding: 14px 12px;
-  gap: 0;
+/* header line under the title */
+.ag__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 16px; }
+.ag__sub { font-size: 13px; color: #64748b; }
+.ag__call {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 14px; border-radius: 999px;
+  border: 1px solid #cbd5e1; background: #fff; color: #0f172a !important;
+  font-size: 13px; font-weight: 700; text-decoration: none !important;
+  transition: background .15s ease, border-color .15s ease;
 }
-#studentMeetingRoot .roster__cell.roster__cell--main .tmc-card,
-#studentMeetingRoot .roster__cell.roster__cell--other .tmc-card { margin-top: 6px; }
+.ag__call:hover { background: #f8fafc; border-color: #94a3b8; }
+.ag__call i { color: #2563eb; }
 
-/* help line under the title */
-.sm-help {
-  margin: -4px 0 14px;
-  padding: 10px 14px;
-  border-radius: 12px;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  color: #1e3a8a;
-  font-size: 13px;
-  line-height: 1.5;
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
+/* one row = date rail on the left + body on the right */
+.ag__row { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 0 18px; }
+.ag__rail { position: relative; text-align: right; padding: 10px 16px 0 0; border-right: 2px solid #e2e8f0; }
+.ag__row--last .ag__rail { border-right-color: transparent; }
+.ag__day { font-size: 14px; font-weight: 800; color: #1e293b; line-height: 1.3; }
+.ag__date { font-size: 12px; color: #94a3b8; font-weight: 600; margin-top: 2px; }
+.ag__dot {
+  position: absolute; right: -6px; top: 14px;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #fff; border: 2px solid #94a3b8; box-sizing: border-box;
 }
-.sm-help i { color: #2563eb; margin-top: 3px; flex-shrink: 0; }
-.sm-help b { color: #1d4ed8; }
-.sm-help a { color: #1d4ed8; font-weight: 700; }
+.ag__body { padding: 4px 0 18px; min-width: 0; }
+.ag__row--last .ag__body { padding-bottom: 6px; }
 
-/* date under the day name, and the "nearest day" pill */
-.sm-date { display: block; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: .2px; }
-#studentMeetingRoot .roster__day.day-today.day-nearest::after { content: 'GẦN NHẤT'; background: #e0f2fe; color: #0369a1; }
+/* today: amber rail */
+.ag__row--today .ag__rail { border-right-color: #f59e0b; }
+.ag__row--today .ag__day { color: #92400e; }
+.ag__row--today .ag__date { color: #b45309; }
+.ag__row--today .ag__dot { right: -7px; width: 12px; height: 12px; top: 13px; background: #f59e0b; border-color: #f59e0b; }
+
+/* day colours on the dots and time pills (same palette as the old grid) */
+.ag__row.day-1 .ag__dot { border-color: #3b82f6; }  .ag__row.day-1 .time-pill { background: #3b82f6; box-shadow: 0 2px 6px rgba(59,130,246,.3); }
+.ag__row.day-2 .ag__dot { border-color: #10b981; }  .ag__row.day-2 .time-pill { background: #10b981; box-shadow: 0 2px 6px rgba(16,185,129,.3); }
+.ag__row.day-3 .ag__dot { border-color: #f59e0b; }  .ag__row.day-3 .time-pill { background: #f59e0b; box-shadow: 0 2px 6px rgba(245,158,11,.3); }
+.ag__row.day-4 .ag__dot { border-color: #f97316; }  .ag__row.day-4 .time-pill { background: #f97316; box-shadow: 0 2px 6px rgba(249,115,22,.3); }
+.ag__row.day-5 .ag__dot { border-color: #8b5cf6; }  .ag__row.day-5 .time-pill { background: #8b5cf6; box-shadow: 0 2px 6px rgba(139,92,246,.3); }
+.ag__row.day-6 .ag__dot { border-color: #14b8a6; }  .ag__row.day-6 .time-pill { background: #14b8a6; box-shadow: 0 2px 6px rgba(20,184,166,.3); }
+.ag__row.day-7 .ag__dot { border-color: #f43f5e; }  .ag__row.day-7 .time-pill { background: #f43f5e; box-shadow: 0 2px 6px rgba(244,63,94,.3); }
+.ag__row--today .ag__dot { border-color: #f59e0b !important; }
+#studentMeetingRoot .ag .time-pill { font-size: 14px; padding: 5px 12px; }
+
+/* a compact planned slot (not today) */
+.ag__slot {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px;
+  padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff;
+  font-size: 13px; color: #1e293b;
+}
+.ag__slot + .ag__slot, .ag__note + .ag__slot { margin-top: 8px; }
+.ag__who { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.ag__who b { font-weight: 700; }
+.ag__role { font-size: 11.5px; font-weight: 600; color: #64748b; }
+.ag__who--sub, .ag__who--sub .ag__role { color: #5b21b6; }
+.ag__struck { text-decoration: line-through; color: #9a3412; font-weight: 600; }
+.ag__note { margin: 6px 2px 0; font-size: 12px; color: #64748b; display: flex; gap: 6px; align-items: flex-start; }
+.ag__note i { margin-top: 2px; }
+
+/* today's expanded card: the strip is the card's header band */
+.ag__card { border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; overflow: hidden; box-shadow: 0 4px 18px rgba(15, 23, 42, .05); }
+.ag__card + .ag__card { margin-top: 10px; }
+.ag__card--ok       { border-color: #a7f3d0; }
+.ag__card--soon     { border-color: #fde68a; }
+.ag__card--sub      { border-color: #ddd6fe; }
+.ag__card--assigned { border-color: #fecdd3; }
+.ag__card--fallback { border-color: #fed7aa; }
+.ag__card--call     { border-color: #fecaca; }
+.ag__card > .sm-strip { border-radius: 0; margin: 0; border-width: 0 0 1px 0; padding: 11px 14px; font-size: 13.5px; }
+.ag__cardbody { padding: 12px 14px 14px; }
+.ag__slotmeta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 2px; }
+.ag__noclass { font-size: 13px; color: #64748b; display: inline-flex; align-items: center; gap: 6px; }
+.ag__others { margin-top: 12px; padding-top: 10px; border-top: 1px dashed #e2e8f0; }
+.ag__empty { padding: 4px 0 8px; }
+
+/* flatten the meeting cards inside the agenda (the card header band already carries the colour) */
+#studentMeetingRoot .ag .tmc-card { background: #fff; border-color: #e2e8f0; margin-top: 8px; }
+#studentMeetingRoot .ag .tmc-card:hover { border-color: #c7d2fe; }
+#studentMeetingRoot .ag .tmc-card--not-yet { opacity: .85; }
+#studentMeetingRoot .ag .tmc-rooms { border-top-color: #e2e8f0; }
+
+/* rooms shown under the teacher's own card */
+.sm-rooms { margin: 8px 0 0; padding: 10px 12px; border: 1px dashed #99f6e4; border-radius: 10px; background: #f0fdfa; }
+.sm-rooms__label { font-size: 11px; font-weight: 700; color: #0f766e; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .3px; }
+.sm-rooms__grid { grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); }
 
 /* the status strip: one coloured sentence per class slot */
 .sm-strip {
@@ -365,7 +417,7 @@
 .sm-strip--off      { background: #f1f5f9; border-color: #e2e8f0; color: #475569; }
 
 /* labelled groups of cards */
-.sm-section { margin-top: 8px; }
+.sm-section { margin-top: 10px; }
 .sm-section__label {
   font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px;
   color: #64748b; margin: 0 0 0 2px; display: flex; align-items: center; gap: 5px;
@@ -379,10 +431,10 @@
 
 /* the call-for-support badge */
 .sm-call {
-  margin-top: 8px; padding: 12px 14px; border-radius: 12px;
-  border: 1px solid #fecaca; background: linear-gradient(180deg, #fef2f2, #fff);
+  margin-top: 10px; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid #fecaca; background: #fef2f2;
 }
-.sm-call--soft { border-color: #e2e8f0; background: linear-gradient(180deg, #f8fafc, #fff); }
+.sm-call--soft { border-color: #e2e8f0; background: #f8fafc; }
 .sm-call__text { font-size: 13px; color: #7f1d1d; font-weight: 600; line-height: 1.45; margin-bottom: 8px; }
 .sm-call__text i { color: #dc2626; margin-right: 4px; }
 .sm-call--soft .sm-call__text { color: #334155; }
@@ -390,29 +442,24 @@
 .sm-call__btn {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 9px 16px; border-radius: 999px;
-  background: linear-gradient(135deg, #ef4444, #dc2626);
-  color: #fff !important; font-weight: 800; font-size: 13px;
+  background: #dc2626; color: #fff !important; font-weight: 800; font-size: 13px;
   text-decoration: none !important;
   box-shadow: 0 3px 10px rgba(220, 38, 38, .3);
   animation: smCallPulse 2s ease-in-out infinite;
   transition: transform .15s ease;
 }
 .sm-call__btn:hover { transform: translateY(-1px); }
-.sm-call--soft .sm-call__btn {
-  background: linear-gradient(135deg, #4f8cff, #6c5ce7);
-  box-shadow: 0 3px 10px rgba(108, 92, 231, .3);
-  animation: none;
-}
+.sm-call--soft .sm-call__btn { background: #4f8cff; box-shadow: 0 3px 10px rgba(79, 140, 255, .3); animation: none; }
 @keyframes smCallPulse {
   0%, 100% { box-shadow: 0 3px 10px rgba(220, 38, 38, .3); }
   50%      { box-shadow: 0 3px 18px rgba(220, 38, 38, .55); }
 }
 .sm-call__hint { margin-top: 8px; font-size: 11.5px; color: #64748b; line-height: 1.4; }
 
-/* a teacher we cannot send the learner to: red = off, grey = no room */
-#studentMeetingRoot .sm-offcard { opacity: .95; border-color: #fecaca; background: linear-gradient(180deg, #fef2f2 0%, #fff 60%); }
+/* a teacher we cannot send the learner to: red = off, grey = no room / no shift */
+#studentMeetingRoot .sm-offcard { opacity: .95; border-color: #fecaca; background: #fff5f5; }
 #studentMeetingRoot .sm-offcard:hover { border-color: #fca5a5; }
-#studentMeetingRoot .sm-offcard--noroom { border-color: #e2e8f0; background: linear-gradient(180deg, #f8fafc 0%, #fff 60%); }
+#studentMeetingRoot .sm-offcard--noroom { border-color: #e2e8f0; background: #f8fafc; }
 #studentMeetingRoot .sm-offcard__avatar { background: #fee2e2; color: #b91c1c; }
 #studentMeetingRoot .sm-offcard--noroom .sm-offcard__avatar { background: #e2e8f0; color: #475569; }
 #studentMeetingRoot .sm-offcard__status { color: #b91c1c; }
@@ -420,23 +467,25 @@
 #studentMeetingRoot .sm-offcard__dot { background: #dc2626; animation: none; }
 #studentMeetingRoot .sm-offcard--noroom .sm-offcard__dot { background: #94a3b8; }
 
-/* planned (not today) rows */
-.sm-plan { padding: 6px 2px 2px; }
-.sm-plan__line { font-size: 13px; color: #1e293b; line-height: 1.7; }
-.sm-plan__who { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; color: #64748b; margin-right: 4px; }
-.sm-plan__line--off { color: #9a3412; }
-.sm-plan__line--sub { color: #5b21b6; }
-.sm-tag { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 700; margin-left: 4px; vertical-align: middle; }
+.sm-tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; vertical-align: middle; white-space: nowrap; }
 .sm-tag--off { background: #fee2e2; color: #b91c1c; }
 .sm-tag--sub { background: #ede9fe; color: #6d28d9; }
-
 .sm-slot-sep { height: 1px; background: #e2e8f0; margin: 10px 0; }
 .sm-muted { font-size: 12px; color: #94a3b8; font-style: italic; }
 .sm-note { font-size: 12px; color: #9a3412; margin: 8px 2px 0; display: flex; gap: 6px; align-items: flex-start; }
 .sm-note i { margin-top: 2px; }
-.sm-empty { grid-column: 1 / -1; padding: 24px; background: #fff; }
 
-/* === tansinh sm-v2 END === */
+/* phones */
+@media (max-width: 640px) {
+  .ag__row { grid-template-columns: 78px minmax(0, 1fr); gap: 0 12px; }
+  .ag__rail { padding-right: 10px; }
+  .ag__day { font-size: 13px; }
+  .ag__date { font-size: 11px; }
+  .ag__cardbody { padding: 10px 12px 12px; }
+  .ag__slot { padding: 9px 10px; }
+}
+
+/* === tansinh sm-v3 END === */
 
 </style>
 
@@ -464,15 +513,6 @@
   <!-- Page content (hidden until logged in) -->
   <div class="meeting-list" id="studentMeetingRoot" style="margin-top:18px; display:none;">
    <h2 class="section-title">Lịch học của bạn</h2>
-<!-- === tansinh sm-v2 BEGIN (10 Oct 2026) === -->
-<p class="sm-help" id="smHelp">
-  <i class="fa-solid fa-circle-info"></i>
-  <span>Mỗi hàng là một buổi học của bạn. Cột <b>Vào lớp với ai?</b> cho biết hôm nay bạn nên bấm vào meeting của giáo viên nào.
-  Nếu GV phụ trách nghỉ, hệ thống tự hiện <b>GV Breakout</b> hoặc <b>GV dạy thay</b> của bạn.
-  Không thấy giáo viên nào? Bấm <a href="https://ringts.tansinh.info/" target="_blank" rel="noopener noreferrer">Gọi hỗ trợ</a> — chúng tôi sẽ xếp lớp cho bạn ngay.</span>
-</p>
-<!-- === tansinh sm-v2 END === -->
-
 <div id="scheduleGrid" aria-live="polite"></div>
 
   </div>
