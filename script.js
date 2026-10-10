@@ -497,6 +497,109 @@ function showLogin() {
 
 
 /* ---------- FAB + Modal ---------- */
+/* === tansinh add-link v1 BEGIN (10 Oct 2026) ===
+   "Thêm meeting link" rebuilt. The teacher's Tiếp HV room is read from
+   watch.tansinh.info (watch-teachers-list + watch-meetings-list) and the link
+   fills itself in. Breakout rooms are ignored on purpose. The "Meeting Work"
+   section is gone: the /addmeeting payload keeps its six keys, meetingWork and
+   meetingWorkLink are sent empty, and meetingHvLink carries the same URL as
+   meetingHv so the "Link gốc" chip on availablemeetings.html keeps working.
+   Undo: python3 patch-meetings-addlink.py undo <folder>  (restores byte for byte). */
+const AL_MEET_BASE = 'https://meeting.tansinh.info/';
+const AL_WATCH_CREATE_URL = 'https://watch.tansinh.info/meetings.html';
+const AL_GOC_SAME_AS_LINK = true; // false -> send meetingHvLink as ''
+
+function alEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+}
+function alUsername(email) {
+  return String(email || '').split('@')[0].trim().toLowerCase();
+}
+function alInitials(name, email) {
+  const src = String(name || email || '').trim();
+  if (!src) return 'GV';
+  const parts = src.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[parts.length - 2].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+}
+function alFmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+// Group watch rooms by teacher email: the one Tiếp HV room, and how many breakouts.
+function alIndexRooms(rows) {
+  const by = new Map();
+  (Array.isArray(rows) ? rows : []).forEach(r => {
+    const em = String(r && r.teacher_email || '').trim().toLowerCase();
+    if (!em) return;
+    const e = by.get(em) || { tiep: null, breakouts: 0 };
+    const room = String(r.room_name || '');
+    const isTiep = r.meeting_type === 'tiep-hv' || (!r.meeting_type && room === alUsername(em));
+    if (isTiep) {
+      // Prefer the row whose name is the plain username; otherwise the first one seen.
+      if (!e.tiep || (room === alUsername(em) && e.tiep.room_name !== alUsername(em))) e.tiep = r;
+    } else {
+      e.breakouts += 1;
+    }
+    by.set(em, e);
+  });
+  return by;
+}
+function alInjectStyles() {
+  if (document.getElementById('tsAddLinkStyles')) return;
+  const st = document.createElement('style');
+  st.id = 'tsAddLinkStyles';
+  st.textContent = `
+.al-modal .modal-header{align-items:flex-start}
+.al-modal [hidden]{display:none !important}
+.al-sub{margin:4px 0 0;font-size:12px;color:#6b7280;line-height:1.4}
+.al-searchwrap{position:relative}
+.al-searchwrap>i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#9ca3af;pointer-events:none;font-size:13px}
+.al-searchwrap .input{padding-left:34px}
+.al-sug .suggestion-item{justify-content:space-between;gap:12px}
+.al-sug .suggestion-item.active{background:#eef2ff}
+.al-sug-main{display:flex;flex-direction:column;min-width:0}
+.al-sug-name{font-weight:600;color:#111827}
+.al-sug-email{font-size:12px;color:#6b7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.al-pill{flex:none;font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;background:#f3f4f6;color:#6b7280}
+.al-pill.ok{background:#dcfce7;color:#166534}
+.al-teacher{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid #e5e7eb;border-radius:12px;margin-bottom:14px;background:#fff}
+.al-avatar{width:40px;height:40px;border-radius:50%;background:#e0ecff;color:#1d4ed8;font-weight:700;display:grid;place-items:center;flex:none}
+.al-who{min-width:0;flex:1}
+.al-name{font-weight:700;color:#111827}
+.al-email{font-size:12px;color:#6b7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.al-change{border:none;background:transparent;color:var(--primary);font-weight:600;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;white-space:nowrap}
+.al-change:hover{background:#f3f4f6}
+.al-room{padding:14px;border-radius:12px;background:#f8fafc;border:1px solid #e5e7eb}
+.al-room-head{font-size:12px;color:#6b7280;margin-bottom:8px}
+.al-status{display:flex;align-items:flex-start;gap:8px;font-size:14px;color:#111827;line-height:1.4}
+.al-dot{width:10px;height:10px;border-radius:50%;background:#9ca3af;margin-top:5px;flex:none}
+.al-status[data-state="ok"] .al-dot{background:#16a34a}
+.al-status[data-state="missing"] .al-dot{background:#f59e0b}
+.al-status[data-state="error"] .al-dot{background:#dc2626}
+.al-status[data-state="loading"] .al-dot{animation:al-pulse 1s ease-in-out infinite}
+@keyframes al-pulse{50%{opacity:.3}}
+@media (prefers-reduced-motion:reduce){.al-status[data-state="loading"] .al-dot{animation:none}}
+.al-status small{display:block;color:#6b7280;font-size:12px;margin-top:2px}
+.al-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 2px}
+.al-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;color:#374151;font-weight:600;font-size:13px;cursor:pointer;text-decoration:none;font-family:inherit}
+.al-btn:hover{background:#f9fafb;border-color:#d1d5db}
+.al-btn:focus-visible,.al-change:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.al-linklabel{display:block;font-size:12px;color:#6b7280;margin:12px 0 6px}
+.al-linkrow{display:flex;align-items:center;gap:6px}
+.al-linkrow .input{flex:1;min-width:0;font-size:13px;background:#fff}
+.al-linkrow .input[readonly]{color:#374151}
+.al-linkrow .icon-btn{display:inline-flex;flex:none;color:#6b7280}
+.al-manual{display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;margin-top:10px;cursor:pointer;user-select:none}
+.al-manual input{width:16px;height:16px;accent-color:var(--primary)}
+.al-dir{margin-top:10px}
+.al-dir strong{color:#374151;word-break:break-all}
+`;
+  document.head.appendChild(st);
+}
+
 function setupFabModal() {
   // Create FAB if missing
   let fab = document.getElementById('fabAdd');
@@ -504,11 +607,13 @@ function setupFabModal() {
     fab = document.createElement('button');
     fab.id = 'fabAdd';
     fab.className = 'fab';
-    fab.title = 'Add';
-    fab.setAttribute('aria-label', 'Add');
+    fab.title = 'Thêm meeting link';
+    fab.setAttribute('aria-label', 'Thêm meeting link');
     fab.innerHTML = '<i class="fa-solid fa-plus" aria-hidden="true"></i>';
     document.body.appendChild(fab);
   }
+
+  alInjectStyles();
 
   // Create modal if missing
   let modal = document.getElementById('fabModal');
@@ -520,58 +625,78 @@ function setupFabModal() {
     modal.innerHTML = `
       <div class="modal-overlay" id="fabOverlay"></div>
 
-      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-  <!-- Saving overlay (hidden by default) -->
-  <div id="savingOverlay" class="saving-overlay" hidden>
-    <div class="saving-box">
-      <div class="spinner"></div>
-      <div class="saving-label">Đang lưu…</div>
-    </div>
-  </div>
+      <div class="modal-content al-modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <!-- Saving overlay (hidden by default) -->
+        <div id="savingOverlay" class="saving-overlay" hidden>
+          <div class="saving-box">
+            <div class="spinner"></div>
+            <div class="saving-label">Đang lưu…</div>
+          </div>
+        </div>
 
         <div class="modal-header">
-          <h3 id="modalTitle">Quick Action</h3>
-          <button class="icon-btn" id="modalClose" aria-label="Close">
+          <div>
+            <h3 id="modalTitle">Thêm meeting link</h3>
+            <p class="al-sub">Link lấy từ watch.tansinh.info. Chỉ dùng phòng Tiếp HV, không dùng phòng Breakout.</p>
+          </div>
+          <button class="icon-btn" id="modalClose" aria-label="Đóng">
             <i class="fa-solid fa-xmark"></i>
           </button>
         </div>
 
         <div class="modal-body">
-          <div class="form-group">
-            <label for="teacherEmail">Teacher Email</label>
-            <input type="text" id="teacherEmail" class="input" placeholder="Type at least 4 characters..." autocomplete="off" />
-            <div id="emailSuggestions" class="suggestions" role="listbox" aria-label="Email suggestions"></div>
-            <p class="hint">Start typing an email (≥ 4 chars). Suggestions appear after 1s.</p>
-          </div>
-
-          <div class="form-group">
-            <label for="teacherName">Teacher Name</label>
-            <input type="text" id="teacherName" class="input" placeholder="Auto-filled" readonly />
-          </div>
-
-          <div class="form-group">
-            <label for="meetingHv">Meeting tiếp HV</label>
-            <input type="text" id="meetingHv" class="input" placeholder="Nhập nội dung..." />
-            <div class="form-subgroup">
-              <label for="meetingHvLink" class="sub-label">Link gốc</label>
-              <input type="url" id="meetingHvLink" class="input" placeholder="Dán link gốc…" inputmode="url" />
+          <div class="form-group" id="alPick">
+            <label for="alSearch">Giáo viên</label>
+            <div class="al-searchwrap">
+              <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+              <input type="text" id="alSearch" class="input" placeholder="Gõ tên hoặc email để tìm" autocomplete="off" />
             </div>
+            <div id="alSug" class="suggestions al-sug" role="listbox" aria-label="Danh sách giáo viên"></div>
+            <p class="hint" id="alPickHint">Đang tải danh sách giáo viên…</p>
           </div>
 
-          <div class="form-group">
-            <label for="meetingWork">Meeting Work</label>
-            <input type="text" id="meetingWork" class="input" placeholder="Nhập nội dung..." />
-            <div class="form-subgroup">
-              <label for="meetingWorkLink" class="sub-label">Link gốc</label>
-              <input type="url" id="meetingWorkLink" class="input" placeholder="Dán link gốc…" inputmode="url" />
+          <div class="al-teacher" id="alTeacher" hidden>
+            <div class="al-avatar" id="alAvatar" aria-hidden="true">GV</div>
+            <div class="al-who">
+              <div class="al-name" id="alName"></div>
+              <div class="al-email" id="alEmail"></div>
             </div>
+            <button type="button" class="al-change" id="alChange">Chọn GV khác</button>
+          </div>
+
+          <div class="al-room" id="alRoom" hidden>
+            <div class="al-room-head">Phòng Tiếp HV trên watch.tansinh.info</div>
+            <div class="al-status" id="alStatus" data-state="loading">
+              <span class="al-dot" aria-hidden="true"></span>
+              <span id="alStatusText">Đang kiểm tra…</span>
+            </div>
+            <div class="al-actions" id="alActions" hidden>
+              <a class="al-btn" id="alCreateLink" href="${AL_WATCH_CREATE_URL}" target="_blank" rel="noopener">
+                <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i> Tạo phòng trên watch
+              </a>
+              <button type="button" class="al-btn" id="alRecheck">
+                <i class="fa-solid fa-rotate" aria-hidden="true"></i> Kiểm tra lại
+              </button>
+            </div>
+            <label for="alLink" class="al-linklabel">Link sẽ lưu</label>
+            <div class="al-linkrow">
+              <input type="url" id="alLink" class="input" inputmode="url" readonly placeholder="https://meeting.tansinh.info/…" />
+              <button type="button" class="icon-btn" id="alCopy" title="Sao chép link" aria-label="Sao chép link">
+                <i class="fa-regular fa-copy" aria-hidden="true"></i>
+              </button>
+              <a class="icon-btn" id="alOpen" href="#" target="_blank" rel="noopener" title="Mở link" aria-label="Mở link">
+                <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+              </a>
+            </div>
+            <label class="al-manual"><input type="checkbox" id="alManual" /> Tự nhập hoặc sửa link</label>
+            <p class="hint al-dir" id="alDir" hidden></p>
           </div>
         </div>
 
         <div class="modal-footer">
-          <button class="btn-ghost" id="modalCancel">Close</button>
-          <button class="btn-primary" id="modalSave">
-            <i class="fa-solid fa-floppy-disk"></i> Save
+          <button class="btn-ghost" id="modalCancel">Đóng</button>
+          <button class="btn-primary" id="modalSave" disabled>
+            <i class="fa-solid fa-floppy-disk"></i> Lưu link
           </button>
         </div>
       </div>`;
@@ -579,117 +704,338 @@ function setupFabModal() {
     document.body.appendChild(modal);
   }
 
-
   if (modal.dataset.wired === 'true') return; // prevent double wiring
+  modal.dataset.wired = 'true';
 
-  const overlay = modal.querySelector('#fabOverlay');
-  const closeBtn = modal.querySelector('#modalClose');
-  const cancelBtn = modal.querySelector('#modalCancel');
-  const saveBtn = modal.querySelector('#modalSave');
+  const qs = (sel) => modal.querySelector(sel);
+  const overlay   = qs('#fabOverlay');
+  const closeBtn  = qs('#modalClose');
+  const cancelBtn = qs('#modalCancel');
+  const saveBtn   = qs('#modalSave');
+  const pickBox   = qs('#alPick');
+  const search    = qs('#alSearch');
+  const sugBox    = qs('#alSug');
+  const pickHint  = qs('#alPickHint');
+  const teacherBox = qs('#alTeacher');
+  const avatarEl  = qs('#alAvatar');
+  const nameEl    = qs('#alName');
+  const emailEl   = qs('#alEmail');
+  const changeBtn = qs('#alChange');
+  const roomBox   = qs('#alRoom');
+  const statusEl  = qs('#alStatus');
+  const statusTxt = qs('#alStatusText');
+  const actionsEl = qs('#alActions');
+  const recheckBtn = qs('#alRecheck');
+  const linkInput = qs('#alLink');
+  const copyBtn   = qs('#alCopy');
+  const openLink  = qs('#alOpen');
+  const manualChk = qs('#alManual');
+  const dirEl     = qs('#alDir');
 
-  // --- Email suggestions + auto-fill name ---
-  const emailInput = modal.querySelector('#teacherEmail');
-  const nameInput = modal.querySelector('#teacherName');
-  const sugBox = modal.querySelector('#emailSuggestions');
-  let debounceId;
+  // --- state ---
+  const st = {
+    teachers: null, teachersErr: '',
+    rooms: null, roomsErr: '', roomsBy: new Map(),
+    email: '', name: '',
+    roomState: 'idle', computedLink: '',
+    sug: [], active: -1,
+    remoteTimer: null, loadSeq: 0,
+  };
 
-  function renderSuggestions(list) {
-    if (!Array.isArray(list) || list.length === 0) {
+  async function alToken() {
+    try {
+      const { data: { session } } = await client.auth.getSession();
+      return session && session.access_token || null;
+    } catch { return null; }
+  }
+  async function alGet(path) {
+    const token = await alToken();
+    if (!token) return { ok: false, status: 0, data: null, err: 'Chưa đăng nhập.' };
+    try {
+      const r = await fetch(_DO + path, { headers: { Authorization: 'Bearer ' + token } });
+      const data = await r.json().catch(() => null);
+      return { ok: r.ok, status: r.status, data, err: r.ok ? '' : ((data && data.error) || r.statusText || ('HTTP ' + r.status)) };
+    } catch (e) {
+      return { ok: false, status: 0, data: null, err: String((e && e.message) || e) };
+    }
+  }
+  function flash(text, cls) {
+    const msg = document.getElementById('message');
+    if (!msg) return;
+    msg.textContent = text;
+    msg.className = cls || '';
+    if (cls === 'success') setTimeout(() => { if (msg.textContent === text) { msg.textContent = ''; msg.className = ''; } }, 1800);
+  }
+
+  // --- load the two watch lists (teachers + rooms) ---
+  async function loadWatch(which) {
+    const seq = ++st.loadSeq;
+    const wantT = which !== 'rooms';
+    const wantR = which !== 'teachers';
+    const [tRes, rRes] = await Promise.all([
+      wantT ? alGet('/watch-teachers-list') : Promise.resolve(null),
+      wantR ? alGet('/watch-meetings-list') : Promise.resolve(null),
+    ]);
+    if (seq !== st.loadSeq) return; // a newer load superseded this one
+    if (tRes) {
+      if (tRes.ok && Array.isArray(tRes.data)) { st.teachers = tRes.data; st.teachersErr = ''; }
+      else { st.teachers = null; st.teachersErr = tRes.err || ('HTTP ' + tRes.status); }
+    }
+    if (rRes) {
+      if (rRes.ok && Array.isArray(rRes.data)) { st.rooms = rRes.data; st.roomsErr = ''; st.roomsBy = alIndexRooms(st.rooms); }
+      else { st.rooms = null; st.roomsErr = rRes.err || ('HTTP ' + rRes.status); st.roomsBy = new Map(); }
+    }
+    updatePickHint();
+    if (st.email) evalRoom();
+    if (search.value.trim() || document.activeElement === search) renderSug(filterTeachers(search.value.trim()));
+  }
+
+  function updatePickHint() {
+    if (st.teachers) {
+      pickHint.textContent = st.teachers.length + ' giáo viên. Gõ để lọc theo tên hoặc email.';
+    } else if (st.teachersErr) {
+      pickHint.textContent = 'Không đọc được danh sách giáo viên từ watch.tansinh.info (' + st.teachersErr + '). Gõ email đầy đủ rồi nhấn Enter.';
+    } else {
+      pickHint.textContent = 'Đang tải danh sách giáo viên…';
+    }
+  }
+
+  // --- suggestions ---
+  function hasTiep(email) {
+    const e = st.roomsBy.get(String(email || '').trim().toLowerCase());
+    return !!(e && e.tiep);
+  }
+  function filterTeachers(q) {
+    if (!st.teachers) return [];
+    const query = q.toLowerCase();
+    const list = st.teachers
+      .filter(t => t && t.email)
+      .filter(t => !query || String(t.full_name || '').toLowerCase().includes(query) || String(t.email).toLowerCase().includes(query))
+      .sort((a, b) => String(a.full_name || a.email).localeCompare(String(b.full_name || b.email), 'vi'));
+    return list.slice(0, 30);
+  }
+  function renderSug(list) {
+    st.sug = Array.isArray(list) ? list : [];
+    st.active = -1;
+    if (st.sug.length === 0) {
       sugBox.innerHTML = '';
       sugBox.style.display = 'none';
       return;
     }
-    sugBox.innerHTML = list
-      .map(email => `<div class="suggestion-item" role="option" data-email="${email}">
-        <i class="fa-solid fa-user"></i> ${email}
-      </div>`)
-      .join('');
+    sugBox.innerHTML = st.sug.map((t) => {
+      const ok = hasTiep(t.email);
+      const pill = st.rooms
+        ? '<span class="al-pill ' + (ok ? 'ok' : '') + '">' + (ok ? 'Có phòng' : 'Chưa có phòng') + '</span>'
+        : '';
+      return '<div class="suggestion-item" role="option" data-email="' + alEsc(t.email) + '" data-name="' + alEsc(t.full_name || '') + '">'
+        + '<div class="al-sug-main"><span class="al-sug-name">' + alEsc(t.full_name || t.email) + '</span>'
+        + '<span class="al-sug-email">' + alEsc(t.email) + '</span></div>' + pill + '</div>';
+    }).join('');
     sugBox.style.display = 'block';
   }
+  function setActive(i) {
+    const items = sugBox.querySelectorAll('.suggestion-item');
+    if (!items.length) return;
+    st.active = Math.max(0, Math.min(items.length - 1, i));
+    items.forEach((el, k) => el.classList.toggle('active', k === st.active));
+    items[st.active].scrollIntoView({ block: 'nearest' });
+  }
+  // Fallback when watch-teachers-list is not readable: the old email search.
+  function remoteSearch(q) {
+    clearTimeout(st.remoteTimer);
+    if (q.length < 3) { renderSug([]); return; }
+    st.remoteTimer = setTimeout(async () => {
+      const res = await alGet('/teachers-search?q=' + encodeURIComponent(q));
+      const emails = (res.ok && res.data && Array.isArray(res.data.suggestions)) ? res.data.suggestions : [];
+      renderSug(emails.map(e => ({ email: e, full_name: '' })));
+    }, 600);
+  }
 
-  // Debounced suggestions (1s) only when ≥4 chars
-  emailInput.addEventListener('input', () => {
-    const q = emailInput.value.trim();
-    clearTimeout(debounceId);
-
-    if (q.length < 4) {
-      renderSuggestions([]);
-      return;
-    }
-
-    debounceId = setTimeout(async () => {
-      try {
-        const { data: { session } } = await client.auth.getSession();
-        const token = session?.access_token;
-        if (!token) return;
-
-        const res = await fetch(`${_DO}/teachers-search?q=${encodeURIComponent(q)}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-
-        if (!res.ok) return renderSuggestions([]);
-        const { suggestions } = await res.json();
-        renderSuggestions(suggestions || []);
-      } catch {
-        renderSuggestions([]);
-      }
-    }, 1000);
+  search.addEventListener('input', () => {
+    const q = search.value.trim();
+    if (st.teachers) renderSug(filterTeachers(q));
+    else remoteSearch(q);
   });
-
-  // Pick a suggestion → fill email → fetch name
-  sugBox.addEventListener('click', async (e) => {
+  search.addEventListener('focus', () => {
+    if (st.teachers) renderSug(filterTeachers(search.value.trim()));
+  });
+  search.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActive(st.active + 1); return; }
+    if (e.key === 'ArrowUp')   { e.preventDefault(); setActive(st.active - 1); return; }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (st.active >= 0 && st.sug[st.active]) { pickTeacher(st.sug[st.active].email, st.sug[st.active].full_name || ''); return; }
+      if (st.sug.length === 1) { pickTeacher(st.sug[0].email, st.sug[0].full_name || ''); return; }
+      const typed = search.value.trim();
+      if (typed.includes('@')) pickTeacher(typed, '');
+    }
+  });
+  sugBox.addEventListener('click', (e) => {
     const item = e.target.closest('.suggestion-item');
     if (!item) return;
+    pickTeacher(item.dataset.email, item.dataset.name || '');
+  });
 
-    const email = item.dataset.email;
-    emailInput.value = email;
-    renderSuggestions([]);
+  // --- choosing a teacher ---
+  async function pickTeacher(email, name) {
+    email = String(email || '').trim().toLowerCase();
+    if (!email) return;
+    renderSug([]);
+    dirInfo = null;
+    st.email = email;
+    st.name = name || '';
+    if (!st.name && st.teachers) {
+      const t = st.teachers.find(x => String(x.email || '').toLowerCase() === email);
+      if (t) st.name = t.full_name || '';
+    }
+    showTeacher();
+    evalRoom();
+    loadDirectory(email);
+    if (!st.name) {
+      const r = await alGet('/teacher-by-email?email=' + encodeURIComponent(email));
+      if (r.ok && r.data && r.data.full_name && st.email === email) { st.name = r.data.full_name; showTeacher(); }
+    }
+  }
+  function showTeacher() {
+    pickBox.hidden = true;
+    teacherBox.hidden = false;
+    roomBox.hidden = false;
+    avatarEl.textContent = alInitials(st.name, st.email);
+    nameEl.textContent = st.name || '(chưa có tên)';
+    emailEl.textContent = st.email;
+  }
+  function setStatus(state, text, small) {
+    st.roomState = state;
+    statusEl.dataset.state = state;
+    statusTxt.innerHTML = alEsc(text) + (small ? '<small>' + alEsc(small) + '</small>' : '');
+    actionsEl.hidden = !(state === 'missing' || state === 'error');
+  }
+  function evalRoom() {
+    if (!st.email) return;
+    const username = alUsername(st.email);
+    if (!st.rooms && !st.roomsErr) {
+      setStatus('loading', 'Đang kiểm tra trên watch.tansinh.info…', '');
+      st.computedLink = AL_MEET_BASE + username;
+    } else if (st.rooms) {
+      const e = st.roomsBy.get(st.email);
+      if (e && e.tiep) {
+        const when = alFmtDate(e.tiep.created_at);
+        const extra = e.breakouts > 0 ? ('Có thêm ' + e.breakouts + ' phòng Breakout, không dùng ở đây.') : '';
+        setStatus('ok', 'Đã có phòng Tiếp HV' + (when ? ', tạo ngày ' + when : '') + '.', extra);
+        st.computedLink = AL_MEET_BASE + String(e.tiep.room_name || username);
+      } else {
+        setStatus('missing', 'Chưa có phòng Tiếp HV trên watch.tansinh.info.',
+          'Tạo phòng ở watch trước rồi bấm Kiểm tra lại. Hoặc tích "Tự nhập hoặc sửa link" để lưu link dự kiến bên dưới.');
+        st.computedLink = AL_MEET_BASE + username;
+      }
+    } else {
+      setStatus('error', 'Không đọc được danh sách phòng từ watch.tansinh.info (' + st.roomsErr + ').',
+        'Thử lại, hoặc tích "Tự nhập hoặc sửa link" để lưu link dự kiến bên dưới.');
+      st.computedLink = AL_MEET_BASE + username;
+    }
+    if (!manualChk.checked) linkInput.value = st.computedLink;
+    syncOpenLink();
+    updateSave();
+    updateDirLine();
+  }
+  function syncOpenLink() {
+    const v = linkInput.value.trim();
+    if (/^https?:\/\//i.test(v)) { openLink.href = v; openLink.style.visibility = ''; }
+    else { openLink.href = '#'; openLink.style.visibility = 'hidden'; }
+  }
+  function updateSave() {
+    const link = linkInput.value.trim();
+    const ok = !!st.email && !!link && (st.roomState === 'ok' || manualChk.checked);
+    saveBtn.disabled = !ok;
+  }
 
+  // --- the existing directory (meeting_links): is this teacher already in it? ---
+  let dirInfo = null;
+  async function loadDirectory(email) {
+    dirInfo = null;
+    updateDirLine();
+    const r = await alGet('/meetinglink-by-email?email=' + encodeURIComponent(email));
+    if (st.email !== email) return;
+    dirInfo = (r.ok && r.data && r.data.link_meeting) ? { link: String(r.data.link_meeting).trim() } : { link: '' };
+    updateDirLine();
+  }
+  function updateDirLine() {
+    if (!dirInfo || !dirInfo.link) { dirEl.hidden = true; dirEl.innerHTML = ''; return; }
+    const cur = linkInput.value.trim();
+    dirEl.hidden = false;
+    if (dirInfo.link === cur) {
+      dirEl.innerHTML = 'Danh bạ meeting link đã có giáo viên này với đúng link này. Lưu lại không bắt buộc.';
+    } else {
+      dirEl.innerHTML = 'Danh bạ đang có link khác cho giáo viên này: <strong>' + alEsc(dirInfo.link) + '</strong>. Lưu để ghi link mới.';
+    }
+  }
+
+  // --- controls ---
+  changeBtn.addEventListener('click', () => { resetForm(); search.focus(); });
+  recheckBtn.addEventListener('click', async () => {
+    recheckBtn.disabled = true;
+    setStatus('loading', 'Đang kiểm tra lại…', '');
+    await loadWatch('rooms');
+    recheckBtn.disabled = false;
+  });
+  manualChk.addEventListener('change', () => {
+    linkInput.readOnly = !manualChk.checked;
+    if (manualChk.checked) linkInput.focus();
+    else { linkInput.value = st.computedLink; syncOpenLink(); }
+    updateSave();
+    updateDirLine();
+  });
+  linkInput.addEventListener('input', () => { syncOpenLink(); updateSave(); updateDirLine(); });
+  copyBtn.addEventListener('click', async () => {
+    const v = linkInput.value.trim();
+    if (!v) return;
     try {
-      const { data: { session } } = await client.auth.getSession();
-      const token = session?.access_token;
-      if (!token) return;
-
-      const r = await fetch(`${_DO}/teacher-by-email?email=${encodeURIComponent(email)}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!r.ok) return;
-      const { full_name } = await r.json();
-      nameInput.value = full_name || '';
-    } catch { /* ignore */ }
+      await navigator.clipboard.writeText(v);
+      copyBtn.innerHTML = '<i class="fa-solid fa-check" aria-hidden="true"></i>';
+      setTimeout(() => { copyBtn.innerHTML = '<i class="fa-regular fa-copy" aria-hidden="true"></i>'; }, 1200);
+    } catch { linkInput.select(); }
   });
 
-  // If user types full email and leaves the field, try to fetch name
-  emailInput.addEventListener('blur', async () => {
-    const email = emailInput.value.trim();
-    if (!email || !email.includes('@')) return;
-    try {
-      const { data: { session } } = await client.auth.getSession();
-      const token = session?.access_token;
-      if (!token) return;
-      const r = await fetch(`${_DO}/teacher-by-email?email=${encodeURIComponent(email)}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!r.ok) return;
-      const { full_name } = await r.json();
-      nameInput.value = full_name || '';
-    } catch { /* ignore */ }
-  });
-
-  // Close suggestions when clicking outside the content area
-  modal.addEventListener('click', (ev) => {
-    const inside = ev.target.closest('.modal-content');
-    if (!inside) renderSuggestions([]);
-  });
+  function resetForm() {
+    st.email = ''; st.name = ''; st.roomState = 'idle'; st.computedLink = '';
+    dirInfo = null;
+    search.value = '';
+    renderSug([]);
+    pickBox.hidden = false;
+    teacherBox.hidden = true;
+    roomBox.hidden = true;
+    manualChk.checked = false;
+    linkInput.readOnly = true;
+    linkInput.value = '';
+    dirEl.hidden = true; dirEl.innerHTML = '';
+    setStatus('loading', 'Đang kiểm tra…', '');
+    updateSave();
+  }
 
   const open = () => { modal.classList.add('show'); modal.setAttribute('aria-hidden', 'false'); };
   const close = () => { modal.classList.remove('show'); modal.setAttribute('aria-hidden', 'true'); };
+
+  // The sidebar button opens this modal by adding the "show" class directly,
+  // so react to the class change rather than to our own open() only.
+  new MutationObserver(() => {
+    const shown = modal.classList.contains('show');
+    if (shown && modal.dataset.open !== '1') {
+      modal.dataset.open = '1';
+      resetForm();
+      updatePickHint();
+      loadWatch('both');
+      setTimeout(() => search.focus(), 30);
+    } else if (!shown && modal.dataset.open === '1') {
+      modal.dataset.open = '0';
+      clearTimeout(st.remoteTimer);
+      renderSug([]);
+    }
+  }).observe(modal, { attributes: true, attributeFilter: ['class'] });
 
   fab.addEventListener('click', async () => {
     const verified = await askSecurityKey('add a meeting');
     if (!verified) return;
     open();
-    emailInput?.focus();
   });
 
   overlay.addEventListener('click', close);
@@ -699,71 +1045,57 @@ function setupFabModal() {
   // ESC to close
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
 
-  // Placeholder save handler
+  // Close suggestions when clicking outside the content area
+  modal.addEventListener('click', (ev) => {
+    const inside = ev.target.closest('.modal-content');
+    if (!inside) renderSug([]);
+  });
+
+  // --- save: same /addmeeting payload shape as before, Meeting Work sent empty ---
   saveBtn.addEventListener('click', async () => {
     const savingOverlay = document.getElementById('savingOverlay');
+    const link = linkInput.value.trim();
+    if (!st.email || !link) return;
 
-    // Disable button + show overlay immediately
     saveBtn.disabled = true;
     savingOverlay?.removeAttribute('hidden');
 
     try {
       const data = {
-        teacherEmail: modal.querySelector('#teacherEmail')?.value?.trim() || '',
-        teacherName: modal.querySelector('#teacherName')?.value?.trim() || '',
-        meetingHv: modal.querySelector('#meetingHv')?.value?.trim() || '',
-        meetingHvLink: modal.querySelector('#meetingHvLink')?.value?.trim() || '',
-        meetingWork: modal.querySelector('#meetingWork')?.value?.trim() || '',
-        meetingWorkLink: modal.querySelector('#meetingWorkLink')?.value?.trim() || '',
+        teacherEmail: st.email,
+        teacherName: st.name || '',
+        meetingHv: link,
+        meetingHvLink: AL_GOC_SAME_AS_LINK ? link : '',
+        meetingWork: '',
+        meetingWorkLink: '',
       };
 
-      // Get the logged-in user's token to prove who is saving
-      const { data: sessionData } = await client.auth.getSession();
-      const token = sessionData?.session?.access_token;
-      if (!token) throw new Error('No session. Please log in again.');
+      const token = await alToken();
+      if (!token) throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
 
-      // Call your Netlify function to insert into DB
       const res = await fetch(_DO + '/addmeeting', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(data)
       });
 
       const out = await res.json().catch(() => ({}));
       if (!res.ok || !out?.ok) {
-        throw new Error(out?.error || res.statusText || 'Save failed');
+        throw new Error(out?.error || res.statusText || 'Lưu thất bại');
       }
 
-      // Success UI
       close();
-      const msg = document.getElementById('message');
-      if (msg) {
-        msg.textContent = 'Saved!';
-        msg.className = 'success';
-        setTimeout(() => { msg.textContent = ''; msg.className = ''; }, 1400);
-
-        loadWorkMeetings(); // refresh list on the main page
-
-      }
+      flash('Đã lưu meeting link.', 'success');
+      loadWorkMeetings(); // refresh list on the main page
     } catch (err) {
-      const msg = document.getElementById('message');
-      if (msg) {
-        msg.textContent = String(err?.message || err);
-        msg.className = 'error';
-      }
+      flash(String(err?.message || err), 'error');
     } finally {
-      // Always hide overlay + re-enable button
       savingOverlay?.setAttribute('hidden', '');
-      saveBtn.disabled = false;
+      updateSave();
     }
   });
-
-
-
 }
+/* === tansinh add-link v1 END === */
 
 /* ---------- Working Meeting FAB + Popup ---------- */
 /* ---------- Working Meeting FAB + Popup (enhanced) ---------- */
