@@ -451,7 +451,7 @@ async function initRoleBasedFab(session) {
 
     // Only Admin / Super Admin get the + FABs
     if (allowed) {
-      // tansinh watch-link v2: setupFabModal() is no longer called; the "Thêm meeting link" popup was removed on 10 Oct 2026.
+      // tansinh watch-link v3: setupFabModal() is no longer called; the "Thêm meeting link" popup was removed on 10 Oct 2026.
       setupWorkingFabModal();   // working-meeting button (right)
       document.body.classList.add('has-add-fab'); // Add class so CSS can position confirm FAB higher
     } else {
@@ -497,13 +497,13 @@ function showLogin() {
 
 
 /* ---------- FAB + Modal ---------- */
-/* === tansinh watch-link v2: the "Thêm meeting link" popup lived here until 10 Oct 2026.
+/* === tansinh watch-link v3: the "Thêm meeting link" popup lived here until 10 Oct 2026.
    Meeting links now come from watch.tansinh.info inside "Thêm ca làm việc" (below), so the
    popup, its FAB and the meeting_links directory are no longer used by this page.
    patch-meetings-watchlink.py undo puts the original block back byte for byte. === */
 
 /* ---------- Working Meeting FAB + Popup ---------- */
-/* === tansinh watch-link v2 BEGIN (10 Oct 2026) ===
+/* === tansinh watch-link v3 BEGIN (10 Oct 2026) ===
    "Thêm ca làm việc" rebuilt. The teacher is searched by name or email in
    watch.tansinh.info's list (/watch-teachers-list), and the meeting link is the
    teacher's Tiếp HV room from /watch-meetings-list: https://meeting.tansinh.info/<room_name>.
@@ -511,6 +511,8 @@ function showLogin() {
    "Thêm meeting link" popup are no longer used. The Work_meeting field is gone:
    /addworkmeeting and /editcalendar keep every payload key, workMeeting is sent
    empty for a new shift and unchanged for an edited one.
+   The time fields are typed 24-hour fields with hour/minute chips for the start and
+   duration chips for the end, replacing the browser's own picker.
    Undo: python3 patch-meetings-watchlink.py undo <folder>  (restores byte for byte). */
 const WL_MEET_BASE = 'https://meeting.tansinh.info/';
 const WL_WATCH_CREATE_URL = 'https://watch.tansinh.info/meetings.html';
@@ -602,6 +604,22 @@ function wlInjectStyles() {
 .wl-note{margin-top:10px}
 .wl-note strong{color:#374151;word-break:break-all}
 .wl-note button{margin-left:6px}
+.wl-time-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px}
+.wl-time-head label{margin:0}
+.wl-time-sum{font-size:12px;color:#6b7280;font-variant-numeric:tabular-nums;text-align:right}
+.wl-time-sum.bad{color:#b91c1c;font-weight:600}
+.wl-time-fields{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.wl-tinput{width:92px;flex:none;text-align:center;font-variant-numeric:tabular-nums;font-size:15px;font-weight:600;padding:8px 10px;font-family:inherit}
+.wl-tinput.bad{border-color:#dc2626}
+.wl-time-arrow{color:#9ca3af}
+.wl-chips{display:flex;flex-wrap:wrap;gap:4px}
+.wl-chip{font-family:inherit;font-size:13px;font-variant-numeric:tabular-nums;line-height:1;padding:7px 0;min-width:40px;text-align:center;border:1px solid #e5e7eb;background:#fff;color:#374151;border-radius:8px;cursor:pointer}
+.wl-chip:hover{border-color:#cbd5e1;background:#f9fafb}
+.wl-chip.on{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
+.wl-chip:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.wl-chiprow{display:flex;align-items:flex-start;gap:8px;margin-top:6px}
+.wl-chiplabel{font-size:12px;color:#6b7280;flex:none;width:56px;padding-top:7px}
+.wl-chips--dur .wl-chip{min-width:46px}
 `;
   document.head.appendChild(st);
 }
@@ -713,20 +731,36 @@ function setupWorkingFabModal() {
             </select>
           </div>
 
-          <!-- Working date + time -->
-          <div class="form-row-3">
-            <div class="form-group">
-              <label for="wmDate">Ngày làm việc</label>
-              <input type="date" id="wmDate" class="input" required />
+          <!-- Working date -->
+          <div class="form-group">
+            <label for="wmDate">Ngày làm việc</label>
+            <input type="date" id="wmDate" class="input" required />
+          </div>
+
+          <!-- Working time: typed 24h fields + chips. No browser time picker. -->
+          <div class="form-group wl-time">
+            <div class="wl-time-head">
+              <label for="wmStart">Giờ làm việc</label>
+              <span class="wl-time-sum" id="wlTimeSum" aria-live="polite"></span>
             </div>
-            <div class="form-group">
-              <label for="wmStart">Bắt đầu</label>
-              <input type="time" id="wmStart" class="input" required />
+            <div class="wl-time-fields">
+              <input type="text" id="wmStart" class="input wl-tinput" inputmode="numeric" placeholder="09:00" autocomplete="off" aria-label="Giờ bắt đầu" />
+              <span class="wl-time-arrow" aria-hidden="true">→</span>
+              <input type="text" id="wmEnd" class="input wl-tinput" inputmode="numeric" placeholder="10:00" autocomplete="off" aria-label="Giờ kết thúc" />
             </div>
-            <div class="form-group">
-              <label for="wmEnd">Kết thúc</label>
-              <input type="time" id="wmEnd" class="input" required />
+            <div class="wl-chiprow">
+              <span class="wl-chiplabel">giờ</span>
+              <div class="wl-chips" id="wlHours" aria-label="Chọn giờ bắt đầu"></div>
             </div>
+            <div class="wl-chiprow">
+              <span class="wl-chiplabel">phút</span>
+              <div class="wl-chips" id="wlMinutes" aria-label="Chọn phút bắt đầu"></div>
+            </div>
+            <div class="wl-chiprow">
+              <span class="wl-chiplabel">kéo dài</span>
+              <div class="wl-chips wl-chips--dur" id="wlDurs" aria-label="Chọn thời lượng, giờ kết thúc tự tính"></div>
+            </div>
+            <p class="hint">Chọn giờ rồi chọn thời lượng, giờ kết thúc tự tính. Gõ 9, 930 hay 9h30 đều được; phím ↑↓ đổi 15 phút.</p>
           </div>
 
           <!-- Repeat (weekly) -->
@@ -789,6 +823,125 @@ function setupWorkingFabModal() {
 
   const ADD_LABEL  = '<i class="fa-solid fa-plus"></i> Thêm ca';
   const SAVE_LABEL = '<i class="fa-solid fa-floppy-disk"></i> Lưu';
+
+  // --- the time picker: typed 24h fields, hour/minute chips for the start, duration chips for the end ---
+  const sumEl   = qs('#wlTimeSum');
+  const hoursEl = qs('#wlHours');
+  const minsEl  = qs('#wlMinutes');
+  const dursEl  = qs('#wlDurs');
+  const HOURS = Array.from({ length: 17 }, (_, i) => i + 6);   // 06 … 22
+  const MINS  = [0, 15, 30, 45];
+  const DURS  = [30, 45, 60, 75, 90, 120, 150, 180];            // minutes
+  let lastDur = 60;   // the end follows the start by this many minutes; survives between shifts
+
+  // "9" "09" "930" "0930" "9:30" "9h30" "9g30" "9.30" "9:3" -> minutes since midnight, or null
+  function tParse(raw) {
+    const s = String(raw || '').trim().toLowerCase().replace(/\s+/g, '');
+    if (!s) return null;
+    let h, mi;
+    if (/^\d+$/.test(s)) {
+      if (s.length <= 2) { h = +s; mi = 0; }
+      else if (s.length === 3) { h = +s[0]; mi = +s.slice(1); }
+      else if (s.length === 4) { h = +s.slice(0, 2); mi = +s.slice(2); }
+      else return null;
+    } else {
+      const m = s.match(/^(\d{1,2})[:hg.,](\d{0,2})$/);
+      if (!m) return null;
+      h = +m[1];
+      mi = m[2] ? +(m[2].length === 1 ? m[2] + '0' : m[2]) : 0;
+    }
+    if (h > 23 || mi > 59) return null;
+    return h * 60 + mi;
+  }
+  function tFmt(min) {
+    min = Math.max(0, Math.min(23 * 60 + 59, min));
+    return String(Math.floor(min / 60)).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0');
+  }
+  function tGet(input) { return tParse(input.value); }
+  function durText(d) {
+    const h = Math.floor(d / 60), m = d % 60;
+    return (h ? h + ' giờ' : '') + (h && m ? ' ' : '') + (m ? m + ' phút' : '');
+  }
+  function durChip(d) {
+    const h = Math.floor(d / 60), m = d % 60;
+    return h ? (h + 'g' + (m ? String(m).padStart(2, '0') : '')) : (m + 'p');
+  }
+  hoursEl.innerHTML = HOURS.map(h => '<button type="button" class="wl-chip" data-h="' + h + '">' + String(h).padStart(2, '0') + '</button>').join('');
+  minsEl.innerHTML  = MINS.map(m => '<button type="button" class="wl-chip" data-m="' + m + '">' + String(m).padStart(2, '0') + '</button>').join('');
+  dursEl.innerHTML  = DURS.map(d => '<button type="button" class="wl-chip" data-d="' + d + '">' + durChip(d) + '</button>').join('');
+
+  function paintTime(editing) {
+    const s = tGet(startInput), e = tGet(endInput);
+    hoursEl.querySelectorAll('[data-h]').forEach(b => b.classList.toggle('on', s != null && +b.dataset.h === Math.floor(s / 60)));
+    minsEl.querySelectorAll('[data-m]').forEach(b => b.classList.toggle('on', s != null && +b.dataset.m === s % 60));
+    dursEl.querySelectorAll('[data-d]').forEach(b => b.classList.toggle('on', s != null && e != null && e - s === +b.dataset.d));
+    startInput.classList.toggle('bad', editing !== startInput && startInput.value.trim() !== '' && s == null);
+    endInput.classList.toggle('bad', editing !== endInput && endInput.value.trim() !== '' && (e == null || (s != null && e <= s)));
+    if (s == null || e == null) { sumEl.textContent = 'Chọn giờ bắt đầu và kết thúc.'; sumEl.classList.remove('bad'); }
+    else if (e <= s) { sumEl.textContent = 'Giờ kết thúc phải sau giờ bắt đầu.'; sumEl.classList.add('bad'); }
+    else { sumEl.textContent = tFmt(s) + ' – ' + tFmt(e) + ' · ' + durText(e - s); sumEl.classList.remove('bad'); }
+  }
+  // Moving the start keeps the shift the same length.
+  function setStart(min) {
+    startInput.value = tFmt(min);
+    endInput.value = tFmt(min + (lastDur > 0 ? lastDur : 60));
+    paintTime();
+  }
+  function setEnd(min) {
+    endInput.value = tFmt(min);
+    const s = tGet(startInput);
+    if (s != null && min > s) lastDur = min - s;
+    paintTime();
+  }
+  // Rewrite a field in HH:MM form. Returns the minutes, or null when it cannot be read.
+  function tFormat(input) {
+    const v = tGet(input);
+    if (v != null) input.value = tFmt(v);
+    return v;
+  }
+  // Leaving a field: a typed start behaves like a chip (the end moves with it);
+  // a typed end teaches the duration the next start will keep.
+  function tCommit(input) {
+    const v = tGet(input);
+    if (v == null) return;
+    if (input === startInput) { setStart(v); return; }
+    input.value = tFmt(v);
+    const s = tGet(startInput);
+    if (s != null && v > s) lastDur = v - s;
+  }
+  hoursEl.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-h]'); if (!b) return;
+    const cur = tGet(startInput);
+    setStart(+b.dataset.h * 60 + (cur == null ? 0 : cur % 60));
+  });
+  minsEl.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-m]'); if (!b) return;
+    const cur = tGet(startInput);
+    setStart((cur == null ? 9 : Math.floor(cur / 60)) * 60 + (+b.dataset.m));
+  });
+  dursEl.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-d]'); if (!b) return;
+    lastDur = +b.dataset.d;
+    const s = tGet(startInput);
+    if (s != null) setEnd(s + lastDur); else paintTime();
+  });
+  [startInput, endInput].forEach((inp) => {
+    inp.addEventListener('input', () => paintTime(inp));
+    inp.addEventListener('blur', () => { tCommit(inp); paintTime(); });
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault(); tCommit(inp); paintTime();
+        if (inp === startInput) endInput.focus(); else inp.blur();
+        return;
+      }
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      e.preventDefault();
+      const step = (e.shiftKey ? 60 : 15) * (e.key === 'ArrowUp' ? 1 : -1);
+      const cur = tGet(inp);
+      if (cur == null) return;
+      if (inp === startInput) setStart(cur + step); else setEnd(cur + step);
+    });
+  });
 
   // --- state ---
   const st = {
@@ -1068,10 +1221,11 @@ function setupWorkingFabModal() {
     st.editId = ''; st.editWorkMeeting = '';
     titleEl.textContent = 'Thêm ca làm việc';
     saveBtn.innerHTML = ADD_LABEL;
-    // Prefill date/time nicely
+    // Prefill date/time nicely; the last start/duration are kept between shifts
     if (!dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
-    if (!startInput.value) startInput.value = '09:00';
-    if (!endInput.value) endInput.value = '10:00';
+    if (tGet(startInput) == null) startInput.value = '09:00';
+    if (tGet(endInput) == null) endInput.value = tFmt(tGet(startInput) + (lastDur > 0 ? lastDur : 60));
+    paintTime();
   }
 
   // 3) Open / close. The sidebar button and the edit button add the "show"
@@ -1115,6 +1269,8 @@ function setupWorkingFabModal() {
     dateInput.value = row.work_date || '';
     startInput.value = String(row.start_time || '').slice(0, 5);
     endInput.value = String(row.end_time || '').slice(0, 5);
+    { const s = tGet(startInput), e = tGet(endInput); if (s != null && e != null && e > s) lastDur = e - s; }
+    paintTime();
     if (deptSelect) deptSelect.value = row.department || '';
     if (recChk) recChk.checked = !row.is_one_time;
 
@@ -1147,6 +1303,10 @@ function setupWorkingFabModal() {
   // 4) Save → /addworkmeeting, or /editcalendar in edit mode. Same payload keys as before.
   saveBtn.addEventListener('click', async () => {
     const isRecurring = !!recChk?.checked;
+    const tS = tFormat(startInput), tE = tFormat(endInput); paintTime();
+    if (tS == null || tE == null) {
+      return showMsg('Giờ chưa hợp lệ. Gõ dạng 09:30, hoặc chọn bằng các nút giờ.', 'error');
+    }
 
     const payload = {
       teacherEmail: st.email,
@@ -1235,7 +1395,7 @@ function setupWorkingFabModal() {
     }
   });
 }
-/* === tansinh watch-link v2 END === */
+/* === tansinh watch-link v3 END === */
 
 
 function showMsg(text, type) {
@@ -4061,7 +4221,7 @@ function setupSidebar() {
     }
   });
 
-  // tansinh watch-link v2: the sidebar "Thêm meeting link" button and its handler were removed on 10 Oct 2026.
+  // tansinh watch-link v3: the sidebar "Thêm meeting link" button and its handler were removed on 10 Oct 2026.
 
   // Sidebar Add Working button (Admin only)
   const addWorkingBtn = document.getElementById('sidebarAddWorking');
