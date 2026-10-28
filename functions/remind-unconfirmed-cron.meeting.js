@@ -179,7 +179,7 @@ module.exports = function (app) {
       const { data: adminUsers } = await supabase
         .from('user_roles')
         .select('email, full_name, role')
-        .in('role', ['Admin', 'Super Admin']);
+        .eq('role', 'Super Admin') /* tansinh superonly 28 Oct 2026: Admin paused; was .in('role', ['Admin', 'Super Admin']) */;
 
       if (!adminUsers || adminUsers.length === 0) {
         console.log('[RemindUnconfirmed] No Admin/Super Admin users found.');

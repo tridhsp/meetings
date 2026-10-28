@@ -24,8 +24,8 @@ require('./routes/learn-today-boot.notice')(app);
 require('./routes/learn-req-chain.notice')(app);
 require('./routes/check-exceeded-students.notice')(app);
 require('./routes/check-unjoined-students.notice')(app);
-require('./routes/remind-unnoted-cron.message')(app);
-require('./routes/recap-messages-cron.message')(app);
+require('./routes/remind-unnoted-cron.messages')(app);
+require('./routes/recap-messages-cron.messages')(app);
 require('./routes/process-recordings-cron.calling')(app);
 require('./routes/remind-unconfirmed-cron.meeting')(app);
 require('./routes/breakout-rooms.meeting')(app);
@@ -42,6 +42,7 @@ require('./routes/lesson-types.baihoc')(app);
 require('./routes/student-lookup.baihoc')(app);
 require('./routes/supabase-credentials.baihoc')(app);
 require('./routes/lessons-next.baihoc')(app);
+require("./routes/book-edit-link.baihoc")(app);   // tansinh bookedit v1
 require('./routes/extra-next.baihoc')(app);
 require('./routes/email-suggest.baihoc')(app);
 require('./routes/lesson-submissions.baihoc')(app);
@@ -55,6 +56,7 @@ require('./routes/unapproved-all.baihoc')(app);
 require('./routes/zalo-status.baihoc')(app);
 require('./routes/presign-wasabi.baihoc')(app);
 require('./routes/save-submission.baihoc')(app);
+require('./routes/req-submit.baihoc')(app); // REQGATE-20261021
 require('./routes/approve-submission.baihoc')(app);
 require('./routes/approved-lessons.baihoc')(app);
 require('./routes/uu-tien-settings.baihoc')(app);
@@ -169,6 +171,8 @@ require("./routes/proofs-api.bookshelf")(app);
 require("./routes/bs-sources.bookshelf")(app);  // BOOKSRC-20260915 books <-> search.tansinh.info articles
 require("./routes/writing-api.bookshelf")(app);   // ANSBOX-20260922
 require("./routes/speaking-api.bookshelf")(app);   // SPEAKX-20260925a the Speaking task route
+require("./routes/bs-req-ai.bookshelf")(app);   // BSREQAI-20261016 "✦ Gợi ý AI": Claude Opus 5.5 writes requirement lines for the book editor (Teacher/Admin/Super Admin only; daily cap + kill switch in bs-req-ai.json)
+require("./routes/bs-learner-notes.bookshelf")(app);   // learner-notes 20261017
 
 // --- Baihoc Remaining Functions (migrated from Netlify) ---
 require("./routes/device-approval-api.baihoc")(app);
@@ -209,12 +213,6 @@ require("./routes/quiz-emergency-submit.quiz")(app);
 require("./routes/quiz-av-convert.quiz")(app); // quiz-av 7 Oct 2026: probe + convert media so Safari can play it
 
 // --- Penalty Routes ---
-require("./routes/pen-credentials.penalty")(app);
-require("./routes/pen-get-penalty-data.penalty")(app);
-require("./routes/pen-get-tieu-chi.penalty")(app);
-require("./routes/pen-get-penalties.penalty")(app);
-require("./routes/pen-delete-penalty.penalty")(app);
-require("./routes/pen-delete-from-penalties.penalty")(app);
 
 // --- LamLaiForm Routes ---
 require("./routes/llf-credentials.lamlaiform")(app);
@@ -248,32 +246,32 @@ require("./routes/rec-health-digest.recorder")(app);
 // (duplicate rec-client-log removed)
 
 // --- Message App Routes (migrated from Netlify) ---
-require("./routes/login.message")(app);
-require("./routes/messages.message")(app);
-require("./routes/mark-noted.message")(app);
-require("./routes/delete-message.message")(app);
-require("./routes/ignore-message.message")(app);
-require("./routes/complete-task.message")(app);
-require("./routes/zalo-create-task.message")(app);
-require("./routes/get-role.message")(app);
-require("./routes/get-sender-names.message")(app);
-require("./routes/counters.message")(app);
-require("./routes/unnoted-count.message")(app);
-require("./routes/search-by-id.message")(app);
-require("./routes/sent-messages.message")(app);
-require("./routes/suggest-students.message")(app);
-require("./routes/search-teacher-email.message")(app);
-require("./routes/get-break-students.message")(app);
-require("./routes/get-working-teachers.message")(app);
-require("./routes/get-response-stats.message")(app);
-require("./routes/get-ignored-logs.message")(app);
-require("./routes/create-template.message")(app);
-require("./routes/create-penalty.message")(app);
-require("./routes/delete-status.message")(app);
-require("./routes/bulk-send-zalo.message")(app);
-require("./routes/bulk-send-zalo-background.message")(app);
-require("./routes/assign-duty.message")(app);
-require("./routes/get-tasks.message")(app);
+// [retired-old-message 18 Oct 2026] require("./routes/login.message")(app);
+// [retired-old-message 18 Oct 2026] require("./routes/messages.message")(app);
+// [retired-old-message 18 Oct 2026] require("./routes/mark-noted.message")(app);
+// [retired-old-message 18 Oct 2026] require("./routes/delete-message.message")(app);
+// [retired-old-message 18 Oct 2026] require("./routes/ignore-message.message")(app);
+// [retired-old-message 18 Oct 2026] require("./routes/complete-task.message")(app);
+// [retired-old-message 18 Oct 2026] require("./routes/zalo-create-task.message")(app);
+// [retired-old-message 18 Oct 2026] require("./routes/get-role.message")(app);
+// [retired-old-message 18 Oct 2026] require("./routes/get-sender-names.message")(app);
+// [retired-old-message 18 Oct 2026] require("./routes/counters.message")(app);
+// [retired-old-message 18 Oct 2026] require("./routes/unnoted-count.message")(app);
+// [retired-old-message 18 Oct 2026] require("./routes/search-by-id.message")(app);
+// [retired-old-message 18 Oct 2026] require("./routes/sent-messages.message")(app);
+// [retired-old-message 18 Oct 2026] require("./routes/suggest-students.message")(app);
+require("./routes/search-teacher-email.messages")(app);
+require("./routes/get-break-students.messages")(app);
+require("./routes/get-working-teachers.messages")(app);
+// [retired-old-message 18 Oct 2026] require("./routes/get-response-stats.message")(app);
+// [retired-old-message 18 Oct 2026] require("./routes/get-ignored-logs.message")(app);
+// [retired-old-message 18 Oct 2026] require("./routes/create-template.message")(app);
+// [retired-old-message 18 Oct 2026] require("./routes/create-penalty.message")(app);
+// [retired-old-message 18 Oct 2026] require("./routes/delete-status.message")(app);
+// [retired-old-message 18 Oct 2026] require("./routes/bulk-send-zalo.message")(app);
+// [retired-old-message 18 Oct 2026] require("./routes/bulk-send-zalo-background.message")(app);
+require("./routes/assign-duty.messages")(app);
+// [retired-old-message 18 Oct 2026] require("./routes/get-tasks.message")(app);
 
 
 // --- Duty App Routes (migrated from Netlify) ---
@@ -1022,6 +1020,7 @@ require('./routes/tst-send-zalo.test.js')(app);
 /* ---- end Test app ---- */
 require("./routes/wsp-api.whisper")(app);
 require("./routes/ring-api.ring")(app);
+require("./routes/ring-inbound.ring")(app);   // tansinh inbound-log v1 (20 Oct 2026): the inbound call ledger
 require("./routes/ring-contacts.ring")(app);   // tansinh danhba (13 Sep 2026)
 require("./routes/ring-key.ring")(app);   // tansinh keys (13 Sep 2026)
 require("./routes/ring-phone.ring")(app);
@@ -1048,13 +1047,23 @@ require('./routes/doc-api.vanban.js')(app);
 require('./routes/sub-api.submit.js')(app);
 
 require('./routes/mtx-api.messages.js')(app);
+require('./routes/mtx-penalty.messages.js')(app); // tansinh penalty 19 Oct 2026: late-reply penalties
+require('./routes/mtx-templates.messages.js')(app);   // tansinh templates 19 Oct 2026: message templates
+require('./routes/mtx-sentlog.messages.js')(app);   // tansinh sentlog 19 Oct 2026: outgoing log for sent.html
+require('./routes/mtx-bulk.messages.js')(app);   // tansinh bulk 19 Oct 2026: bulk send for bulk.html
 require("./routes/rts-api.ringts")(app);
 require("./routes/exp-api.explain")(app);
 require("./routes/decuong-list.baihoc")(app);   // TSPATCH-DECUONG-20260930 the De cuong list route
+require("./routes/decuong-lesson.explain")(app);   // TSPATCH-DCLESSON-20261022 the "Giao bài học" routes
+require("./routes/exp-handouts.explain")(app);   // TSPATCH-EXPHANDOUTS-20261023
 require("./routes/cal-contracts.calendar")(app);  // === tc contract BEGIN (7 Oct 2026) === END ===
 require("./routes/cal-fixedhours.calendar")(app);   // tansinh fixed-blocks (8 Oct 2026)
 require("./routes/cal-offhistory.calendar")(app);   // tansinh off-history (8 Oct 2026)
 require("./routes/cal-teacher-levels.calendar")(app);   // tansinh teacher-levels (9 Oct 2026)
+require("./routes/bm-student-picture.baihoc")(app); // BKMGMT-20261011 Book management console (Super Admin only). Undo: install-bm-route.py undo
+require('./routes/sub-session.submit')(app); /* TSPATCH-SUBSESSION-20261012 */
+require('./routes/sub-chuanop.submit')(app);   // TSPATCH-SUBCHUANOP-20261013
+require("./routes/tv-api.thuvien")(app);
 app.listen(PORT, () => {
   console.log('API server running on port ' + PORT);
 });
@@ -1072,7 +1081,7 @@ require("./routes/tc-upload-image.teachercodes")(app);
 
 // --- Kiosk Routes ---
 require("./routes/ksk-whitelist.kiosk")(app);
-require("./routes/msg-credentials.message")(app);
+// [retired-old-message 18 Oct 2026] require("./routes/msg-credentials.message")(app);
 require("./routes/reg-change-password.register")(app);
 
 // --- Score (score.tansinh.info) routes ---
@@ -1084,5 +1093,6 @@ require("./routes/score-save-results.score")(app);
 require("./routes/score-list-results.score")(app);
 require("./routes/score-suggest-learners.score")(app);
 require("./routes/score-presign-r2.score")(app);
+require("./routes/score-book-sync.score")(app);   // tansinh score-report (24 Oct 2026)
 require("./routes/glv-grant-day-context.giolamviec")(app);
 require("./routes/glv-month-confirm.giolamviec")(app);
