@@ -5267,3 +5267,20 @@ body:not(.app) #sidebarPageSlot { display: none; }
   #sidebar .sb-link.is-loading i { animation: none; }
 }
 /* === tansinh sb-v1 END === */
+
+/* === tansinh shiftdur-v1 BEGIN (2 Nov 2026): a long shift shows in every column it runs through;
+   hours per day, per column and per week; the parts of a split shift carry a ‹ › mark. === */
+.roster__summary { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 10px; }
+.roster__chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: #f8fafc; border: 1px solid #e5e7eb; color: #374151; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.roster__chip--total { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+.roster__chip--warn { background: #fff7ed; border-color: #fed7aa; color: #c2410c; }
+.roster__head { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; }
+.roster__head-hours { font-size: 11px; font-weight: 600; color: #6b7280; font-variant-numeric: tabular-nums; }
+.roster__day { flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; }
+.roster__day-hours { font-size: 11px; font-weight: 600; color: #6b7280; font-variant-numeric: tabular-nums; }
+.pill__cont { font-style: normal; color: #9ca3af; padding: 0 2px; }
+@media (max-width: 720px) {
+  .roster__summary { gap: 4px; }
+  .roster__chip { padding: 3px 8px; font-size: 11px; }
+}
+/* === tansinh shiftdur-v1 END === */

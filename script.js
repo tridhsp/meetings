@@ -628,6 +628,7 @@ function wlInjectStyles() {
 .wl-dur{margin-left:auto;padding-bottom:11px;font-size:13px;color:#6b7280;font-variant-numeric:tabular-nums;white-space:nowrap}
 .wl-dur b{color:#111827;font-weight:700}
 .wl-dur.bad{color:#b91c1c;font-weight:600}
+.wl-bands{margin:-2px 0 6px;color:#374151}.wl-bands b{color:#1d4ed8;font-weight:700}/* tansinh shiftdur-v1 */
 .wl-bar{margin-top:12px;padding:0 11px;touch-action:none;user-select:none;-webkit-user-select:none}
 .wl-ticks{position:relative;height:16px;font-size:11px;color:#9ca3af;font-variant-numeric:tabular-nums;pointer-events:none}
 .wl-tick{position:absolute;top:0;transform:translateX(-50%)}
@@ -794,6 +795,7 @@ function setupWorkingFabModal() {
                 </div>
               </div>
             </div>
+            <p class="hint wl-bands" id="wlBands" hidden></p><!-- tansinh shiftdur-v1: which columns this shift will show in -->
             <p class="hint">Bấm ca mẫu, kéo thanh thời gian, bấm − +, hoặc gõ giờ (9h30, 930 đều được). Dời giờ bắt đầu thì giờ kết thúc dời theo.</p>
           </div>
 
@@ -904,6 +906,18 @@ function setupWorkingFabModal() {
     const h = Math.floor(d / 60), m = d % 60;
     return (h ? h + ' giờ' : '') + (h && m ? ' ' : '') + (m ? m + ' phút' : '');
   }
+  // tansinh shiftdur-v1: say which columns of the grid this shift will show in (shiftPieces is the grid's own rule)
+  const bandsEl = qs('#wlBands');
+  function paintBands(s, e) {
+    if (!bandsEl) return;
+    let pieces = [];
+    try { if (s != null && e != null && e > s) pieces = shiftPieces({ start_time: tFmt(s), end_time: tFmt(e) }); } catch (err) { pieces = []; }
+    if (pieces.length <= 1) { bandsEl.hidden = true; bandsEl.textContent = ''; return; }
+    const names = { morning: 'Sáng', afternoon: 'Chiều', evening: 'Tối' };
+    bandsEl.innerHTML = 'Trên lịch, ca này hiện ở <b>' + pieces.length + ' cột</b>: '
+      + pieces.map(p => '<b>' + wlEsc(names[p.key] || p.key) + '</b> ' + tFmt(p.lo) + '–' + tFmt(p.hi)).join(' · ') + '.';
+    bandsEl.hidden = false;
+  }
 
   // The three school shifts, read from ROSTER_SHIFTS so the presets can never drift from the roster grid.
   const PRESET_NAMES = { morning: 'Sáng', afternoon: 'Chiều', evening: 'Tối' };
@@ -974,6 +988,7 @@ function setupWorkingFabModal() {
     if (s == null || e == null) { durEl.textContent = 'Chọn giờ bắt đầu và kết thúc'; durEl.classList.remove('bad'); }
     else if (e <= s) { durEl.textContent = 'Kết thúc phải sau bắt đầu'; durEl.classList.add('bad'); }
     else { durEl.innerHTML = '<b>' + wlEsc(durText(e - s)) + '</b>'; durEl.classList.remove('bad'); }
+    paintBands(s, e);   // tansinh shiftdur-v1
   }
   // Moving the start keeps the shift the same length.
   function setStart(min) {
@@ -2309,14 +2324,193 @@ function minutesFromHHMM(hhmm) {
 function overlapMins(a1, a2, b1, b2) {
   return Math.max(0, Math.min(a2, b2) - Math.max(a1, b1));
 }
-// Bucket by START TIME only:
-// <12:00 => morning, 12:00–17:59 => afternoon, >=18:00 => evening
+// Column of a shift by its START time: <12:00 => morning, 12:00–17:59 => afternoon, >=18:00 => evening.
+// tansinh shiftdur-v1: the grid now uses shiftPieces() (below), which puts a shift in EVERY column it
+// runs through; whichShift() is kept as the fallback for a shift shorter than ROSTER_BAND_MIN or with bad times.
 function whichShift(startHHMM /*, endHHMM not needed */) {
   const s = minutesFromHHMM(startHHMM || '00:00');
   if (s >= minutesFromHHMM('18:00')) return 'evening';
   if (s >= minutesFromHHMM('12:00')) return 'afternoon';
   return 'morning';
 }
+
+/* === tansinh shiftdur-v1 BEGIN (2 Nov 2026) ===
+   HOW A SHIFT'S TIME IS MANAGED, in one place.
+   ROSTER_BANDS         the three bands of the day the grid's columns stand for. The boundaries are the
+                        ones whichShift() used (12:00 and 18:00). ROSTER_SHIFTS keeps the preset times
+                        and the column labels.
+   shiftMinutes(row)    how long a shift is, in minutes.
+   shiftPieces(row)     the parts of a shift, one per band it runs through. 05:00-21:00 gives three:
+                        morning 05:00-12:00, afternoon 12:00-18:00, evening 18:00-21:00. A part shorter
+                        than ROSTER_BAND_MIN folds into its neighbour, so 08:00-12:30 stays one part.
+   shiftBandMinutes(row) exact minutes per band, no folding: {morning, afternoon, evening}.
+   summarizeWeekShifts(rows, weekStart)  the week's totals: by day, by band, by teacher, overlaps.
+   window.TS_SHIFTS     all of the above for other code, plus .week = this week's summary (set by
+                        loadWorkMeetings), so a new feature can read durations without recomputing.
+   Every pill on the grid also carries data-minutes (the whole shift) and data-band (its column).
+   Undo: python3 patch-meetings-shiftdur.py undo <folder>  (restores byte for byte). */
+const ROSTER_BANDS = [
+  { key: 'morning',   lo: 0,       hi: 12 * 60, name: 'Sáng'  },
+  { key: 'afternoon', lo: 12 * 60, hi: 18 * 60, name: 'Chiều' },
+  { key: 'evening',   lo: 18 * 60, hi: 24 * 60, name: 'Tối'   },
+];
+const ROSTER_BAND_MIN = 45;   // a part shorter than this (minutes) folds into the neighbouring part
+
+function tsFmtMin(min) {
+  min = Math.max(0, Math.min(24 * 60, Math.round(Number(min) || 0)));
+  return String(Math.floor(min / 60)).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0');
+}
+// "16 giờ", "1 giờ 30 phút", "45 phút"
+function tsDurText(min) {
+  min = Math.max(0, Math.round(Number(min) || 0));
+  const h = Math.floor(min / 60), m = min % 60;
+  if (!h && !m) return '0 phút';
+  return (h ? h + ' giờ' : '') + (h && m ? ' ' : '') + (m ? m + ' phút' : '');
+}
+// "16g", "1g30", "45p" - for tight spaces
+function tsDurShort(min) {
+  min = Math.max(0, Math.round(Number(min) || 0));
+  const h = Math.floor(min / 60), m = min % 60;
+  if (!h) return m + 'p';
+  return h + 'g' + (m ? String(m).padStart(2, '0') : '');
+}
+function shiftMinutes(row) {
+  const s = minutesFromHHMM(row && row.start_time), e = minutesFromHHMM(row && row.end_time);
+  return e > s ? e - s : 0;
+}
+function shiftPieces(row) {
+  const s = minutesFromHHMM(row && row.start_time), e = minutesFromHHMM(row && row.end_time);
+  const one = (key) => [{ key, lo: s, hi: e, minutes: Math.max(0, e - s), index: 0, count: 1, first: true, last: true }];
+  if (!(e > s) || (e - s) < ROSTER_BAND_MIN) return one(whichShift(row && row.start_time));
+  const pieces = [];
+  for (const b of ROSTER_BANDS) {
+    const lo = Math.max(s, b.lo), hi = Math.min(e, b.hi);
+    if (hi > lo) pieces.push({ key: b.key, lo, hi, minutes: hi - lo });
+  }
+  // fold a short part into its neighbour: into the earlier part when there is one, else into the later one
+  let folded = true;
+  while (folded && pieces.length > 1) {
+    folded = false;
+    for (let i = 0; i < pieces.length; i++) {
+      if (pieces[i].minutes >= ROSTER_BAND_MIN) continue;
+      const into = i > 0 ? pieces[i - 1] : pieces[i + 1];
+      into.lo = Math.min(into.lo, pieces[i].lo);
+      into.hi = Math.max(into.hi, pieces[i].hi);
+      into.minutes = into.hi - into.lo;
+      pieces.splice(i, 1);
+      folded = true;
+      break;
+    }
+  }
+  if (!pieces.length) return one(whichShift(row && row.start_time));
+  pieces.forEach((p, i) => { p.index = i; p.count = pieces.length; p.first = i === 0; p.last = i === pieces.length - 1; });
+  return pieces;
+}
+function shiftBandMinutes(row) {
+  const out = { morning: 0, afternoon: 0, evening: 0 };
+  const s = minutesFromHHMM(row && row.start_time), e = minutesFromHHMM(row && row.end_time);
+  if (!(e > s)) return out;
+  for (const b of ROSTER_BANDS) out[b.key] = Math.max(0, Math.min(e, b.hi) - Math.max(s, b.lo));
+  return out;
+}
+// Minutes covered by a set of [lo, hi) intervals, counting an overlap once
+function tsUnionMinutes(ivs) {
+  const a = (ivs || []).filter(x => x[1] > x[0]).sort((x, y) => x[0] - y[0]);
+  let total = 0, lo = null, hi = null;
+  for (const [s, e] of a) {
+    if (lo == null || s > hi) { if (lo != null) total += hi - lo; lo = s; hi = e; }
+    else if (e > hi) hi = e;
+  }
+  if (lo != null) total += hi - lo;
+  return total;
+}
+function summarizeWeekShifts(rows, weekStart) {
+  const sum = {
+    weekStart: weekStart instanceof Date ? formatYMD(weekStart) : (weekStart || ''),
+    minutes: 0, shifts: 0, teachers: 0, overlapMinutes: 0,
+    byDay: {}, byBand: { morning: 0, afternoon: 0, evening: 0 }, byDayBand: {}, byTeacher: {},
+    longest: null,
+  };
+  for (let d = 1; d <= 7; d++) { sum.byDay[d] = 0; sum.byDayBand[d] = { morning: 0, afternoon: 0, evening: 0 }; }
+  const perTeacherDay = {};
+  for (const r of (rows || [])) {
+    if (!r) continue;
+    const mins = shiftMinutes(r);
+    const d = rosterDayIndex(r.work_date);
+    const email = String(r.teacher_email || '').toLowerCase();
+    sum.shifts += 1;
+    sum.minutes += mins;
+    if (sum.byDay[d] != null) sum.byDay[d] += mins;
+    const bm = shiftBandMinutes(r);
+    for (const k in bm) { sum.byBand[k] += bm[k]; if (sum.byDayBand[d]) sum.byDayBand[d][k] += bm[k]; }
+    const t = sum.byTeacher[email] || (sum.byTeacher[email] = { email, name: r.teacher_name || email, minutes: 0, shifts: 0, byDay: {} });
+    t.minutes += mins; t.shifts += 1; t.byDay[d] = (t.byDay[d] || 0) + mins;
+    const k = email + '|' + r.work_date;
+    (perTeacherDay[k] = perTeacherDay[k] || []).push([minutesFromHHMM(r.start_time), minutesFromHHMM(r.end_time)]);
+    if (!sum.longest || mins > sum.longest.minutes) {
+      sum.longest = { minutes: mins, teacher: r.teacher_name || email, email, date: r.work_date, start: wmTimeHHMM(r.start_time), end: wmTimeHHMM(r.end_time) };
+    }
+  }
+  for (const k in perTeacherDay) {
+    const ivs = perTeacherDay[k];
+    const plain = ivs.reduce((a, x) => a + Math.max(0, x[1] - x[0]), 0);
+    sum.overlapMinutes += plain - tsUnionMinutes(ivs);
+  }
+  sum.teachers = Object.keys(sum.byTeacher).length;
+  return sum;
+}
+// --- the grid's use of the above ---
+function rosterSortMin(r) { return r && r._piece ? r._piece.lo : minutesFromHHMM(String((r && r.start_time) || '0:0')); }
+function rosterTimeHtml(row) {
+  const p = row._piece, rec = row.is_one_time ? '' : ' ↻';
+  if (!p || p.count <= 1) return wmEscape(`${wmTimeHHMM(row.start_time)}–${wmTimeHHMM(row.end_time)}${rec}`);
+  const before = p.first ? '' : '<i class="pill__cont" aria-hidden="true">‹</i>';
+  const after  = p.last  ? '' : '<i class="pill__cont" aria-hidden="true">›</i>';
+  return before + wmEscape(`${tsFmtMin(p.lo)}–${tsFmtMin(p.hi)}`) + after + wmEscape(rec);
+}
+function rosterTimeTitle(row) {
+  const p = row._piece, mins = row._minutes != null ? row._minutes : shiftMinutes(row);
+  const whole = `${wmTimeHHMM(row.start_time)}–${wmTimeHHMM(row.end_time)} (${tsDurText(mins)})`;
+  if (!p || p.count <= 1) return 'Ca ' + whole;
+  const band = (ROSTER_BANDS.find(b => b.key === p.key) || {}).name || p.key;
+  return `Ca ${whole} — phần ${p.index + 1}/${p.count}, cột ${band}: ${tsFmtMin(p.lo)}–${tsFmtMin(p.hi)} (${tsDurText(p.minutes)})`;
+}
+// The rows behind a bucket set, each once (a long shift sits in up to three buckets)
+function rosterUniqueRows(buckets) {
+  const seen = new Set(), out = [];
+  for (let d = 1; d <= 7; d++) {
+    for (const b of ROSTER_BANDS) {
+      for (const r of ((buckets && buckets[d] && buckets[d][b.key]) || [])) {
+        const k = `${r.id}|${r.work_date}|${r.start_time}|${r.end_time}`;
+        if (!seen.has(k)) { seen.add(k); out.push(r); }
+      }
+    }
+  }
+  return out;
+}
+// The strip above the grid: hours this week, shifts, teachers, hours per column, overlapping hours
+function rosterSummaryHtml(sum) {
+  if (!sum || !sum.shifts) return '';
+  const band = ROSTER_BANDS.map(b => `${b.name} ${tsDurShort((sum.byBand && sum.byBand[b.key]) || 0)}`).join(' · ');
+  const chips = [
+    `<span class="roster__chip roster__chip--total" title="Tổng giờ của mọi ca trong tuần"><i class="fa-regular fa-clock" aria-hidden="true"></i> ${wmEscape(tsDurText(sum.minutes))}</span>`,
+    `<span class="roster__chip" title="Số ca trong tuần">${sum.shifts} ca</span>`,
+    `<span class="roster__chip" title="Số giáo viên có ca trong tuần">${sum.teachers} GV</span>`,
+    `<span class="roster__chip" title="Giờ theo khung Sáng (đến 12:00), Chiều (12:00–18:00), Tối (từ 18:00)">${wmEscape(band)}</span>`,
+  ];
+  if (sum.overlapMinutes > 0) {
+    chips.push(`<span class="roster__chip roster__chip--warn" title="Cùng một giáo viên có hai ca chồng giờ nhau">${wmEscape(tsDurShort(sum.overlapMinutes))} trùng ca</span>`);
+  }
+  return `<div class="roster__summary" id="rosterSummary">${chips.join('')}</div>`;
+}
+window.TS_SHIFTS = {
+  bands: ROSTER_BANDS, bandMin: ROSTER_BAND_MIN,
+  minutes: shiftMinutes, pieces: shiftPieces, bandMinutes: shiftBandMinutes,
+  summarize: summarizeWeekShifts, unionMinutes: tsUnionMinutes,
+  durText: tsDurText, durShort: tsDurShort, fmtMin: tsFmtMin,
+  week: null,   // set by loadWorkMeetings() every time the grid is drawn
+};
+/* === tansinh shiftdur-v1 END === */
 
 // Expand weekly-recurring rows to the CURRENT displayed week
 // and deduplicate by (teacher + date + start + end)
@@ -2387,24 +2581,26 @@ function bucketizeByDayAndShift(rows) {
   for (let d = 1; d <= 7; d++) g[d] = { morning: [], afternoon: [], evening: [] };
   for (const r of rows) {
     const d = rosterDayIndex(r.work_date);
-    const k = whichShift(r.start_time, r.end_time);
-    if (!k) continue; // skip rows that don't overlap a defined shift
-    g[d][k].push(r);
+    // tansinh shiftdur-v1: one part per column the shift runs through, so a long shift (05:00–21:00) shows in every column it covers
+    const mins = shiftMinutes(r);
+    for (const p of shiftPieces(r)) if (g[d][p.key]) g[d][p.key].push({ ...r, _piece: p, _minutes: mins });
   }
   return g;
 }
 
 // Renders the 7×3 grid
-function renderRoster(buckets) {
-  let html = `<div class="roster">`;
+function renderRoster(buckets, summary) {
+  const sum = summary || summarizeWeekShifts(rosterUniqueRows(buckets));   // tansinh shiftdur-v1
+  let html = rosterSummaryHtml(sum) + `<div class="roster">`;
   // Header row (empty corner + 3 shift headers)
   html += `<div class="roster__head"></div>`;
-  html += ROSTER_SHIFTS.map(s => `<div class="roster__head">${wmEscape(s.label)}</div>`).join('');
+  html += ROSTER_SHIFTS.map(s => `<div class="roster__head"><span>${wmEscape(s.label)}</span>${(sum.byBand && sum.byBand[s.key]) ? `<small class="roster__head-hours" title="Giờ làm trong khung này, cả tuần">${wmEscape(tsDurShort(sum.byBand[s.key]))}</small>` : ''}</div>`).join('');   // tansinh shiftdur-v1
 
   // 7 day rows
   for (let d = 1; d <= 7; d++) {
     const dayClass = `day-${d}`; // Mon=1 … Sun=7
-    html += `<div class="roster__day ${dayClass}">${wmEscape(ROSTER_DAY_NAMES[d])}</div>`;
+    const dayMins = (sum.byDay && sum.byDay[d]) || 0;   // tansinh shiftdur-v1
+    html += `<div class="roster__day ${dayClass}"><span class="roster__day-name">${wmEscape(ROSTER_DAY_NAMES[d])}</span>${dayMins ? `<span class="roster__day-hours" title="${wmEscape('Tổng giờ các ca: ' + tsDurText(dayMins))}">${wmEscape(tsDurShort(dayMins))}</span>` : ''}</div>`;
     for (const sh of ROSTER_SHIFTS) {
       const items = buckets[d][sh.key] || [];
       if (!items.length) {
@@ -2426,7 +2622,7 @@ function renderRoster(buckets) {
       html += `<div class="roster__cell ${dayClass}">` +
         teacherOrder.map(key => {
           // tansinh roster-v1 (11 Oct 2026): earliest shift first, so two shifts read top to bottom in time order
-          const group = teacherGroups[key].slice().sort((a, b) => minutesFromHHMM(String(a.start_time || '0:0')) - minutesFromHHMM(String(b.start_time || '0:0')));
+          const group = teacherGroups[key].slice().sort((a, b) => rosterSortMin(a) - rosterSortMin(b));   // tansinh shiftdur-v1: by the part shown in this column
           const r = group[0]; // first row for name/avatar/dept/actions
           const name = r.teacher_name || r.teacher_email || '(No name)';
           const initials = wmInitials(name);
@@ -2436,7 +2632,7 @@ function renderRoster(buckets) {
           // A department is written on each line only when the shifts belong to different departments.
           const mixedDepts = new Set(group.map(row => String(row.department || '').trim().toLowerCase())).size > 1;
           const timeSlotsHtml = group.map((row, idx) => {
-            const time = `${wmTimeHHMM(row.start_time)}–${wmTimeHHMM(row.end_time)}${row.is_one_time ? '' : ' ↻'}`;
+            const time = rosterTimeHtml(row);   // tansinh shiftdur-v1: the part of the shift that sits in this column
             const slotDept = mixedDepts && row.department
               ? `<i class="pill__dept pill__slot-dept ${wmDeptClass(row.department)}">${wmEscape(row.department)}</i>`
               : ``;
@@ -2444,7 +2640,7 @@ function renderRoster(buckets) {
               data-row-id="${row.id}"
               data-work-date="${row.work_date}"
               data-start-time="${String(row.start_time || '').slice(0, 5)}"
-              data-end-time="${String(row.end_time || '').slice(0, 5)}">${slotDept}${wmEscape(time)}</span>`;
+              data-end-time="${String(row.end_time || '').slice(0, 5)}" title="${wmEscape(rosterTimeTitle(row))}">${slotDept}${time}</span>`;
           }).join('');
 
           return `
@@ -2457,6 +2653,8 @@ function renderRoster(buckets) {
   data-end-time="${String(r.end_time || '').slice(0, 5)}"
   data-teacher-name="${wmEscape(name)}"
   data-department="${wmEscape(r.department || '')}"
+  data-band="${wmEscape(sh.key)}"
+  data-minutes="${r._minutes != null ? r._minutes : shiftMinutes(r)}"
   title="${wmEscape(name)}">
 
 <span class="pill__avatar">${wmEscape(initials)}</span>
@@ -2468,7 +2666,7 @@ function renderRoster(buckets) {
             }
   ${isMulti
               ? `<div class="pill__time-slots">${timeSlotsHtml}</div>`
-              : `<span class="pill__time">${wmEscape(`${wmTimeHHMM(r.start_time)}–${wmTimeHHMM(r.end_time)}${r.is_one_time ? '' : ' ↻'}`)}</span>`
+              : `<span class="pill__time${r._piece && r._piece.count > 1 ? ' pill__time--part' : ''}" title="${wmEscape(rosterTimeTitle(r))}">${rosterTimeHtml(r)}</span>`
             }
 </span>
 
@@ -2649,13 +2847,14 @@ const expanded = expandRecurringForWeek(rows, weekStart);
 
   const cleanedRows = removeContainedSessions(weekRows);
   const buckets = bucketizeByDayAndShift(cleanedRows);
+  window.TS_SHIFTS.week = summarizeWeekShifts(cleanedRows, weekStart);   // tansinh shiftdur-v1: this week's durations, for any feature that needs them
 
   // 4) Render + week label
   const labelEl = document.getElementById('weekLabel');
   if (labelEl) labelEl.textContent = formatWeekLabel(weekStart);
   // Load tiep-hv URLs map before rendering (so each chip can look up its Jitsi link)
   await loadTiepHvUrls(token);
-  box.innerHTML = renderRoster(buckets);
+  box.innerHTML = renderRoster(buckets, window.TS_SHIFTS.week);
 
   // 4b) Show off teachers this week
   renderOffTeachersToday(expanded, offSet, weekStart);
