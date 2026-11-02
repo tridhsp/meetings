@@ -155,6 +155,7 @@ require("./routes/rtr-presign-wasabi.realtimereport")(app);
 
 // --- Bookshelf Routes ---
 require("./routes/books-api.bookshelf")(app);
+require("./routes/reqnotes-api.bookshelf")(app);   // REQNOTES-20261030: ghi chú trên "Sách thiếu yêu cầu" (reqalert.html)
 require("./routes/chapters-api.bookshelf")(app);
 require("./routes/versions-api.bookshelf")(app);  // BOOKVER-20260910 version history for books and lessons
 require("./routes/section-presets-api.bookshelf")(app);  // TSPATCH-SECPRESETS-20260831
@@ -170,6 +171,7 @@ require("./routes/supabase-credentials-bookshelf.bookshelf")(app);
 require("./routes/proofs-api.bookshelf")(app);
 require("./routes/bs-sources.bookshelf")(app);  // BOOKSRC-20260915 books <-> search.tansinh.info articles
 require("./routes/writing-api.bookshelf")(app);   // ANSBOX-20260922
+require("./routes/writing-brief.bookshelf")(app);   // tansinh teacher-brief v1
 require("./routes/speaking-api.bookshelf")(app);   // SPEAKX-20260925a the Speaking task route
 require("./routes/bs-req-ai.bookshelf")(app);   // BSREQAI-20261016 "✦ Gợi ý AI": Claude Opus 5.5 writes requirement lines for the book editor (Teacher/Admin/Super Admin only; daily cap + kill switch in bs-req-ai.json)
 require("./routes/bs-learner-notes.bookshelf")(app);   // learner-notes 20261017
@@ -1021,6 +1023,7 @@ require('./routes/tst-send-zalo.test.js')(app);
 require("./routes/wsp-api.whisper")(app);
 require("./routes/ring-api.ring")(app);
 require("./routes/ring-inbound.ring")(app);   // tansinh inbound-log v1 (20 Oct 2026): the inbound call ledger
+require("./routes/drv-api.drive")(app);   // tansinh drive v2 (29 Oct 2026)
 require("./routes/ring-contacts.ring")(app);   // tansinh danhba (13 Sep 2026)
 require("./routes/ring-key.ring")(app);   // tansinh keys (13 Sep 2026)
 require("./routes/ring-phone.ring")(app);
