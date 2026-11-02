@@ -5286,17 +5286,18 @@ body:not(.app) #sidebarPageSlot { display: none; }
 /* === tansinh shiftdur-v1 END === */
 /* === tansinh polish-v1 BEGIN (2 Nov 2026): the roster's look. Pills at the top of their cell, white rounded
    rows, names at medium weight, a "1 lần" tag instead of ↻, Vietnamese headers with the band's edge and an
-   hours chip, the date and "Hôm nay" on the day, a blue edge on the band running now, a green dot on
+   hours chip, the day column as a vertical ribbon (today solid blue), a blue edge on the band running now, a green dot on
    teachers on duty, the week strip with a Sáng/Chiều/Tối bar, and on screens 1280px and wider a
    double-width Tối column with two pills per row. === */
 .roster { align-items: stretch; }
 .roster .roster__cell { justify-content: flex-start; align-content: flex-start; gap: 5px; padding: 7px; border-radius: 14px; }
-.roster .roster__day { justify-content: flex-start; align-items: flex-start; padding: 8px 10px; gap: 1px; border-radius: 14px; }
-.roster .roster__day-name { font-size: 14px; font-weight: 700; color: #111827; }
-.roster .roster__day-date { font-size: 11px; font-weight: 500; color: #6b7280; }
-.roster .roster__day-hours { margin-top: 5px; font-size: 12px; font-weight: 700; color: #374151; font-variant-numeric: tabular-nums; }
-.roster .roster__day--today { box-shadow: inset 3px 0 0 #2563eb, 0 1px 2px rgba(0, 0, 0, .05); }
-.roster .roster__today { margin-top: 6px; font-size: 11px; font-weight: 600; color: #1d4ed8; background: #dbeafe; border-radius: 999px; padding: 1px 7px; }
+.roster { grid-template-columns: 30px repeat(3, minmax(0, 1fr)); }
+.roster .roster__day { justify-content: flex-start; align-items: center; padding: 12px 0; gap: 0; border-radius: 10px; box-shadow: none; }
+.roster .roster__day-text { writing-mode: vertical-rl; font-size: 12px; font-weight: 500; letter-spacing: .03em; white-space: nowrap; line-height: 1; color: #374151; font-variant-numeric: tabular-nums; }
+.roster .roster__day-text > span { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; }
+.roster .roster__day-text > span + span::before { content: ' · '; }
+.roster .roster__day--today { background: #2563eb; border-color: #2563eb; }
+.roster .roster__day--today .roster__day-text { color: #fff; }
 .roster .roster__head { position: sticky; top: 0; z-index: 3; background: var(--page); gap: 3px; padding: 6px 4px 8px; }
 .roster .roster__head-name { font-size: 14px; font-weight: 700; color: #111827; }
 .roster .roster__head-sub { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; }
@@ -5325,7 +5326,7 @@ body:not(.app) #sidebarPageSlot { display: none; }
 .roster__bar-legend { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: #6b7280; margin-top: 3px; font-variant-numeric: tabular-nums; }
 .roster__now { font-size: 11px; color: #9ca3af; margin-left: auto; }
 @media (min-width: 1280px) {
-  .roster { grid-template-columns: 84px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2fr); }
+  .roster { grid-template-columns: 30px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2fr); }
   .roster > .roster__cell[data-band="evening"] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
   .roster > .roster__cell[data-band="evening"] .empty-cell { grid-column: 1 / -1; }
 }

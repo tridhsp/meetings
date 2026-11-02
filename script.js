@@ -2637,7 +2637,7 @@ function renderRoster(buckets, summary) {
     const dayClass = `day-${d}`; // Mon=1 … Sun=7
     const dayMins = (sum.byDay && sum.byDay[d]) || 0;   // tansinh shiftdur-v1
     const dayDate = tsPolishDayDate(sum.weekStart, d), isToday = !!dayDate.ymd && dayDate.ymd === tsPolishTodayYMD();   // tansinh polish-v1
-    html += `<div class="roster__day ${dayClass}${isToday ? ' roster__day--today' : ''}" data-day="${d}"><span class="roster__day-name">${wmEscape(ROSTER_DAY_NAMES[d])}</span>${dayDate.text ? `<span class="roster__day-date">${wmEscape(dayDate.text)}</span>` : ''}${dayMins ? `<span class="roster__day-hours" title="${wmEscape('Tổng giờ các ca: ' + tsDurText(dayMins))}">${wmEscape(tsDurShort(dayMins))}</span>` : ''}${isToday ? '<span class="roster__today">Hôm nay</span>' : ''}</div>`;   // tansinh polish-v1: date + Hôm nay
+    html += `<div class="roster__day ${dayClass}${isToday ? ' roster__day--today' : ''}" data-day="${d}" title="${wmEscape(ROSTER_DAY_NAMES[d] + (dayDate.text ? ' ' + dayDate.text : '') + (dayMins ? ' — tổng giờ các ca: ' + tsDurText(dayMins) : ''))}"><span class="roster__day-text">${isToday ? '<span class="roster__today">Hôm nay</span>' : ''}<span class="roster__day-name">${wmEscape(ROSTER_DAY_NAMES[d])}</span>${dayDate.text ? `<span class="roster__day-date">${wmEscape(dayDate.text)}</span>` : ''}${dayMins ? `<span class="roster__day-hours">${wmEscape(tsDurShort(dayMins))}</span>` : ''}</span></div>`;   // tansinh polish-v1: a vertical ribbon — Hôm nay · day · date · hours
     for (const sh of ROSTER_SHIFTS) {
       const items = buckets[d][sh.key] || [];
       if (!items.length) {
