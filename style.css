@@ -5331,10 +5331,12 @@ body:not(.app) #sidebarPageSlot { display: none; }
   .roster > .roster__cell[data-band="evening"] .empty-cell { grid-column: 1 / -1; }
 }
 /* === tansinh polish-v1 END === */
-/* === tansinh fewhv-v1 BEGIN (2 Nov 2026): the few-students warning badge, the week chip and the tooltip.
+/* === tansinh fewhv-v2 BEGIN (2 Nov 2026): the few-students warning badge, the week chip and the tooltip.
    Amber = 1 or 2 students, red = none; the same colours as the note and request markers on the pills.
+   The badge sits at the right end of the pill; on hover the action buttons slide in to its LEFT (right: 60px).
    Undo: python3 patch-meetings-fewhv.py undo <folder>  (restores byte for byte). === */
-.roster .pill__fewhv { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; padding: 1px 6px; border-radius: 999px; font-size: 10px; font-weight: 700; line-height: 1.5; vertical-align: 1px; white-space: nowrap; cursor: help; background: #fffbeb; border: 1px solid #fcd34d; color: #b45309; font-variant-numeric: tabular-nums; }
+.roster .pill__fewhv { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: 999px; font-size: 10px; font-weight: 700; line-height: 1.5; white-space: nowrap; cursor: help; position: relative; z-index: 2; background: #fffbeb; border: 1px solid #fcd34d; color: #b45309; font-variant-numeric: tabular-nums; }
+.roster .pill--fewhv:hover .pill__actions { right: 60px; }   /* the buttons stop short of the badge, so it is never covered */
 .roster .pill__fewhv i { font-size: 9px; }
 .roster .pill__fewhv--zero { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
 .roster .pill__fewhv:hover, .roster .pill__fewhv:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
@@ -5360,5 +5362,5 @@ body:not(.app) #sidebarPageSlot { display: none; }
 .request-tooltip .fewhv-note { font-size: 11px; color: #6b7280; margin-top: 10px; line-height: 1.45; }
 .request-tooltip .fewhv-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; font-weight: 600; color: #1d4ed8; text-decoration: none; }
 .request-tooltip .fewhv-link:hover { text-decoration: underline; }
-@media (max-width: 720px) { .roster .pill__fewhv { margin-left: 4px; padding: 0 5px; } }
-/* === tansinh fewhv-v1 END === */
+@media (max-width: 720px) { .roster .pill__fewhv { padding: 0 5px; } }
+/* === tansinh fewhv-v2 END === */

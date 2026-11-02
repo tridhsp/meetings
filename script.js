@@ -2547,12 +2547,17 @@ function tsPolishMarkNow() {
 }
 if (!window.__tsPolishTimer) window.__tsPolishTimer = setInterval(() => { try { tsPolishMarkNow(); } catch (e) {} }, 60 * 1000);
 /* === tansinh polish-v1 END === */
-/* === tansinh fewhv-v1 BEGIN (2 Nov 2026): a warning badge on a shift whose teacher has few or no students ===
+/* === tansinh fewhv-v2 BEGIN (2 Nov 2026): a warning badge on a shift whose teacher has few or no students ===
    WHAT IT DOES. After the grid is drawn, every pill (one teacher, one column, one day) gets a count of the
    students that teacher handles whose lesson overlaps the pill's time window (data-lo .. data-hi, the part
    of the shift shown in that column). 0, 1 or 2 students (FEWHV_MAX) -> a badge after the name: "1 HV" in
    amber, "0 HV" in red. Hover, tap or focus the badge for the list. The week strip gets one chip with how
    many shifts this week carry a badge. Every pill also carries data-fewhv-count and data-fewhv-day.
+   WHERE THE BADGE SITS (v2). At the RIGHT END of the pill, after the time. On hover the pill's action
+   buttons slide in to the LEFT of it (CSS: .pill--fewhv:hover .pill__actions { right: 60px }), so they
+   never cover it — in v1 the badge sat after the name and the buttons covered it, which made the card
+   flicker. The card stays open while the pointer is anywhere inside that pill or on the card, and
+   closes when the pointer has left both; it is not redrawn while it is already open for the same badge.
    WHERE THE DATA COMES FROM — the same tables the "Transfer students" popup already reads from the browser:
      student_schedule  student_email, day_of_week (0 = Sunday), time_local, teacher_email (TTKB),
                        breakout_email (Breakout), buoi_phu
@@ -2678,8 +2683,8 @@ async function tsFewHvMark(weekStart) {
       students: students.map(s => ({ n: s.name, s: s.start, e: s.end, m: s.mins, r: s.role, p: s.phu ? 1 : 0, w: s.inWindow ? 1 : 0 })) });
     pill.classList.add('pill--fewhv');
     if (count === 0) pill.classList.add('pill--fewhv-zero');
-    const nameEl = pill.querySelector('.pill__name');
-    if (nameEl) nameEl.insertAdjacentHTML('beforeend', fewhvBadgeHtml(count));
+    const slot = pill.querySelector('.pill__meta') || pill.querySelector('.pill__name');   // the right end of the pill, after the time
+    if (slot) slot.insertAdjacentHTML('beforeend', fewhvBadgeHtml(count));
     flagged++;
     if (count === 0) zeroes++;
   });
@@ -2736,17 +2741,11 @@ function fewhvSetupTooltip() {
   tip.id = 'fewhvTooltip';
   tip.className = 'request-tooltip fewhv-tooltip hidden';
   document.body.appendChild(tip);
-  let hideTimer = null, current = null;
-  const close = () => { clearTimeout(hideTimer); tip.classList.add('hidden'); current = null; };
-  const hide = () => { clearTimeout(hideTimer); hideTimer = setTimeout(close, 220); };
-  const show = (badge) => {
-    clearTimeout(hideTimer);
-    const pill = badge.closest('.pill');
-    if (!pill || !pill.dataset.fewhv) return;
-    let d;
-    try { d = JSON.parse(pill.dataset.fewhv); } catch (e) { return; }
-    current = badge;
-    tip.innerHTML = fewhvTooltipHtml(pill, d);
+  let hideTimer = null, current = null, currentPill = null;
+  const close = () => { clearTimeout(hideTimer); hideTimer = null; tip.classList.add('hidden'); current = null; currentPill = null; };
+  const hide = () => { clearTimeout(hideTimer); hideTimer = setTimeout(close, 260); };
+  const inside = (node) => !!node && node.nodeType === 1 && ((currentPill && currentPill.contains(node)) || tip.contains(node));
+  const place = (badge) => {
     const rect = badge.getBoundingClientRect();
     const w = Math.min(360, window.innerWidth - 40);
     let left = rect.left + rect.width / 2;
@@ -2760,13 +2759,31 @@ function fewhvSetupTooltip() {
       tip.style.bottom = 'auto'; tip.style.top = (rect.bottom + 8) + 'px';
       tip.classList.add('tooltip-below'); tip.classList.remove('tooltip-above');
     }
+  };
+  const show = (badge) => {
+    clearTimeout(hideTimer); hideTimer = null;
+    if (current === badge && !tip.classList.contains('hidden')) return;     // already open for this badge: nothing to redraw
+    const pill = badge.closest('.pill');
+    if (!pill || !pill.dataset.fewhv) return;
+    let d;
+    try { d = JSON.parse(pill.dataset.fewhv); } catch (e) { return; }
+    current = badge; currentPill = pill;
+    tip.innerHTML = fewhvTooltipHtml(pill, d);
+    place(badge);
     tip.classList.remove('hidden');
   };
   const badgeOf = (e) => (e.target && e.target.closest) ? e.target.closest('.pill__fewhv') : null;
-  document.addEventListener('mouseover', (e) => { const b = badgeOf(e); if (b) show(b); });
-  document.addEventListener('mouseout', (e) => { const b = badgeOf(e); if (b && !(e.relatedTarget && tip.contains(e.relatedTarget))) hide(); });
+  document.addEventListener('mouseover', (e) => {
+    const b = badgeOf(e);
+    if (b) { show(b); return; }
+    if (currentPill && inside(e.target)) { clearTimeout(hideTimer); hideTimer = null; }   // still on the pill or the card: stay open
+  });
+  document.addEventListener('mouseout', (e) => {
+    if (!currentPill) return;
+    if (inside(e.target) && !inside(e.relatedTarget)) hide();                           // the pointer left both the pill and the card
+  });
   document.addEventListener('focusin', (e) => { const b = badgeOf(e); if (b) show(b); });
-  document.addEventListener('focusout', (e) => { const b = badgeOf(e); if (b) hide(); });
+  document.addEventListener('focusout', (e) => { const b = badgeOf(e); if (b && !inside(e.relatedTarget)) hide(); });
   document.addEventListener('click', (e) => {
     const b = badgeOf(e);
     if (b) { if (current === b && !tip.classList.contains('hidden')) close(); else show(b); return; }
@@ -2774,11 +2791,9 @@ function fewhvSetupTooltip() {
     if (!tip.contains(e.target)) close();
   });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
-  tip.addEventListener('mouseenter', () => clearTimeout(hideTimer));
-  tip.addEventListener('mouseleave', hide);
 }
 window.TS_FEWHV = { max: FEWHV_MAX, skipDepts: FEWHV_SKIP_DEPTS, phuMinutes: FEWHV_PHU_MIN, mark: tsFewHvMark, studentsFor: fewhvStudentsFor, last: null };
-/* === tansinh fewhv-v1 END === */
+/* === tansinh fewhv-v2 END === */
 
 // Expand weekly-recurring rows to the CURRENT displayed week
 // and deduplicate by (teacher + date + start + end)
@@ -3128,7 +3143,7 @@ const expanded = expandRecurringForWeek(rows, weekStart);
   await loadTiepHvUrls(token);
   box.innerHTML = renderRoster(buckets, window.TS_SHIFTS.week);
   try { tsPolishMarkNow(); } catch (e) { console.warn('[polish] markNow', e); }   // tansinh polish-v1
-  try { tsFewHvMark(weekStart); } catch (e) { console.warn('[fewhv] mark', e); }   // tansinh fewhv-v1: the few-students badges, drawn once the student lists have loaded
+  try { tsFewHvMark(weekStart); } catch (e) { console.warn('[fewhv] mark', e); }   // tansinh fewhv-v2: the few-students badges, drawn once the student lists have loaded
 
   // 4b) Show off teachers this week
   renderOffTeachersToday(expanded, offSet, weekStart);
