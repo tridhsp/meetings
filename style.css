@@ -5284,3 +5284,49 @@ body:not(.app) #sidebarPageSlot { display: none; }
   .roster__chip { padding: 3px 8px; font-size: 11px; }
 }
 /* === tansinh shiftdur-v1 END === */
+/* === tansinh polish-v1 BEGIN (2 Nov 2026): the roster's look. Pills at the top of their cell, white rounded
+   rows, names at medium weight, a "1 lần" tag instead of ↻, Vietnamese headers with the band's edge and an
+   hours chip, the date and "Hôm nay" on the day, a blue edge on the band running now, a green dot on
+   teachers on duty, the week strip with a Sáng/Chiều/Tối bar, and on screens 1280px and wider a
+   double-width Tối column with two pills per row. === */
+.roster { align-items: stretch; }
+.roster .roster__cell { justify-content: flex-start; align-content: flex-start; gap: 5px; padding: 7px; border-radius: 14px; }
+.roster .roster__day { justify-content: flex-start; align-items: flex-start; padding: 8px 10px; gap: 1px; border-radius: 14px; }
+.roster .roster__day-name { font-size: 14px; font-weight: 700; color: #111827; }
+.roster .roster__day-date { font-size: 11px; font-weight: 500; color: #6b7280; }
+.roster .roster__day-hours { margin-top: 5px; font-size: 12px; font-weight: 700; color: #374151; font-variant-numeric: tabular-nums; }
+.roster .roster__day--today { box-shadow: inset 3px 0 0 #2563eb, 0 1px 2px rgba(0, 0, 0, .05); }
+.roster .roster__today { margin-top: 6px; font-size: 11px; font-weight: 600; color: #1d4ed8; background: #dbeafe; border-radius: 999px; padding: 1px 7px; }
+.roster .roster__head { position: sticky; top: 0; z-index: 3; background: var(--page); gap: 3px; padding: 6px 4px 8px; }
+.roster .roster__head-name { font-size: 14px; font-weight: 700; color: #111827; }
+.roster .roster__head-sub { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; }
+.roster .roster__head-hint { font-size: 11px; color: #6b7280; }
+.roster .roster__head-hours { font-size: 11px; font-weight: 600; color: #374151; background: #fff; border: 1px solid #e5e7eb; border-radius: 999px; padding: 1px 7px; }
+.roster .roster__head--now .roster__head-name { color: #1d4ed8; }
+.roster .roster__cell--now { border: 1px solid #93c5fd; }
+.roster .roster__nowlabel { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: #1d4ed8; padding: 0 4px 1px; }
+.roster .roster__nowlabel::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #22c55e; flex: none; }
+.roster .pill { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 5px 9px; gap: 8px; }
+.roster .pill__avatar { position: relative; width: 24px; height: 24px; }
+.roster .pill__name { font-weight: 500; }
+.roster .pill__time, .roster .pill__time-slot { font-variant-numeric: tabular-nums; }
+.roster .pill__once { font-style: normal; font-size: 10px; font-weight: 600; color: #6b7280; border: 1px solid #d1d5db; border-radius: 4px; padding: 0 4px; margin-left: 4px; vertical-align: 1px; }
+.roster .pill--now .pill__avatar::after { content: ''; position: absolute; right: -2px; bottom: -2px; width: 9px; height: 9px; border-radius: 50%; background: #22c55e; border: 2px solid #fff; }
+.roster .pill--now .pill__time, .roster .pill--now .pill__time-slot { color: #15803d; }
+.roster__summary { gap: 10px 18px; margin: 0 0 12px; }
+.roster__total { display: flex; align-items: baseline; gap: 8px; }
+.roster__total b { font-size: 20px; font-weight: 700; color: #111827; font-variant-numeric: tabular-nums; }
+.roster__total span { font-size: 12px; color: #6b7280; }
+.roster__bands { flex: 1 1 220px; min-width: 200px; max-width: 520px; }
+.roster__bar { display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: #e5e7eb; }
+.roster__bar-seg--morning { background: #fbbf24; }
+.roster__bar-seg--afternoon { background: #fb923c; }
+.roster__bar-seg--evening { background: #818cf8; }
+.roster__bar-legend { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: #6b7280; margin-top: 3px; font-variant-numeric: tabular-nums; }
+.roster__now { font-size: 11px; color: #9ca3af; margin-left: auto; }
+@media (min-width: 1280px) {
+  .roster { grid-template-columns: 84px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2fr); }
+  .roster > .roster__cell[data-band="evening"] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+  .roster > .roster__cell[data-band="evening"] .empty-cell { grid-column: 1 / -1; }
+}
+/* === tansinh polish-v1 END === */

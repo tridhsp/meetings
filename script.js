@@ -2281,17 +2281,17 @@ function wmDateVN(dYmd) {
 
 
 /* ---------- Roster helpers (Mon→Sun × Morning/Afternoon/Evening) ---------- */
-const ROSTER_SHIFTS = [
-  { key: 'morning', start: '08:00', end: '12:00', label: 'Morning 08:00–12:00' },
-  { key: 'afternoon', start: '15:00', end: '18:00', label: 'Afternoon 15:00–18:00' },
-  { key: 'evening', start: '18:00', end: '21:00', label: 'Evening 18:00–21:00' },
+const ROSTER_SHIFTS = [   // tansinh polish-v1 (2 Nov 2026): Vietnamese labels, the band's real edge as a hint. start/end are still the presets.
+  { key: 'morning', start: '08:00', end: '12:00', label: 'Sáng', hint: 'đến 12:00' },
+  { key: 'afternoon', start: '15:00', end: '18:00', label: 'Chiều', hint: '12:00–18:00' },
+  { key: 'evening', start: '18:00', end: '21:00', label: 'Tối', hint: 'từ 18:00' },
 ];
 
 // OLD
 // const ROSTER_DAY_NAMES = [null, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 // NEW (abbreviated)
-const ROSTER_DAY_NAMES = [null, 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const ROSTER_DAY_NAMES = [null, 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'];   // tansinh polish-v1: Vietnamese
 
 function startOfWeekLocal(d, mondayAsFirst = 1) {
   const dt = new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -2461,12 +2461,12 @@ function summarizeWeekShifts(rows, weekStart) {
 }
 // --- the grid's use of the above ---
 function rosterSortMin(r) { return r && r._piece ? r._piece.lo : minutesFromHHMM(String((r && r.start_time) || '0:0')); }
-function rosterTimeHtml(row) {
-  const p = row._piece, rec = row.is_one_time ? '' : ' ↻';
-  if (!p || p.count <= 1) return wmEscape(`${wmTimeHHMM(row.start_time)}–${wmTimeHHMM(row.end_time)}${rec}`);
+function rosterTimeHtml(row) {   // tansinh polish-v1: the ↻ is gone (it sat on nearly every pill); a one-off shift gets a "1 lần" tag instead
+  const p = row._piece, rec = row.is_one_time ? ' <i class="pill__once" title="Ca một lần, không lặp hàng tuần">1 lần</i>' : '';
+  if (!p || p.count <= 1) return wmEscape(`${wmTimeHHMM(row.start_time)}–${wmTimeHHMM(row.end_time)}`) + rec;
   const before = p.first ? '' : '<i class="pill__cont" aria-hidden="true">‹</i>';
   const after  = p.last  ? '' : '<i class="pill__cont" aria-hidden="true">›</i>';
-  return before + wmEscape(`${tsFmtMin(p.lo)}–${tsFmtMin(p.hi)}`) + after + wmEscape(rec);
+  return before + wmEscape(`${tsFmtMin(p.lo)}–${tsFmtMin(p.hi)}`) + after + rec;
 }
 function rosterTimeTitle(row) {
   const p = row._piece, mins = row._minutes != null ? row._minutes : shiftMinutes(row);
@@ -2489,19 +2489,16 @@ function rosterUniqueRows(buckets) {
   return out;
 }
 // The strip above the grid: hours this week, shifts, teachers, hours per column, overlapping hours
-function rosterSummaryHtml(sum) {
+function rosterSummaryHtml(sum) {   // tansinh polish-v1: one figure for the week, the three bands as a bar, the counts beside it, the clock at the end
   if (!sum || !sum.shifts) return '';
-  const band = ROSTER_BANDS.map(b => `${b.name} ${tsDurShort((sum.byBand && sum.byBand[b.key]) || 0)}`).join(' · ');
-  const chips = [
-    `<span class="roster__chip roster__chip--total" title="Tổng giờ của mọi ca trong tuần"><i class="fa-regular fa-clock" aria-hidden="true"></i> ${wmEscape(tsDurText(sum.minutes))}</span>`,
-    `<span class="roster__chip" title="Số ca trong tuần">${sum.shifts} ca</span>`,
-    `<span class="roster__chip" title="Số giáo viên có ca trong tuần">${sum.teachers} GV</span>`,
-    `<span class="roster__chip" title="Giờ theo khung Sáng (đến 12:00), Chiều (12:00–18:00), Tối (từ 18:00)">${wmEscape(band)}</span>`,
-  ];
-  if (sum.overlapMinutes > 0) {
-    chips.push(`<span class="roster__chip roster__chip--warn" title="Cùng một giáo viên có hai ca chồng giờ nhau">${wmEscape(tsDurShort(sum.overlapMinutes))} trùng ca</span>`);
-  }
-  return `<div class="roster__summary" id="rosterSummary">${chips.join('')}</div>`;
+  const total = Math.max(1, sum.minutes || 0);
+  const bar = ROSTER_BANDS.map(b => { const m = (sum.byBand && sum.byBand[b.key]) || 0; return `<i class="roster__bar-seg roster__bar-seg--${wmEscape(b.key)}" style="width:${(100 * m / total).toFixed(1)}%" title="${wmEscape(b.name + ' ' + tsDurText(m))}"></i>`; }).join('');
+  const legend = ROSTER_BANDS.map(b => `<span>${wmEscape(b.name)} ${wmEscape(tsDurShort((sum.byBand && sum.byBand[b.key]) || 0))}</span>`).join('');
+  const warn = sum.overlapMinutes > 0 ? `<span class="roster__chip roster__chip--warn" title="Cùng một giáo viên có hai ca chồng giờ nhau">${wmEscape(tsDurShort(sum.overlapMinutes))} trùng ca</span>` : '';
+  return `<div class="roster__summary" id="rosterSummary">` +
+    `<div class="roster__total" title="${wmEscape('Tổng giờ của mọi ca trong tuần: ' + tsDurText(sum.minutes))}"><b>${wmEscape(tsDurShort(sum.minutes))}</b><span>tuần này · ${sum.shifts} ca · ${sum.teachers} GV</span></div>` +
+    `<div class="roster__bands" title="Giờ theo khung Sáng (đến 12:00), Chiều (12:00–18:00), Tối (từ 18:00)"><div class="roster__bar">${bar}</div><div class="roster__bar-legend">${legend}</div></div>` +
+    warn + `<span class="roster__now" id="rosterNow"></span></div>`;
 }
 window.TS_SHIFTS = {
   bands: ROSTER_BANDS, bandMin: ROSTER_BAND_MIN,
@@ -2511,6 +2508,45 @@ window.TS_SHIFTS = {
   week: null,   // set by loadWorkMeetings() every time the grid is drawn
 };
 /* === tansinh shiftdur-v1 END === */
+/* === tansinh polish-v1 BEGIN (2 Nov 2026): the roster's look. Vietnamese day and band names, the date and
+   "Hôm nay" on the day cell, the band and the teachers on duty right now, the week strip with its bar.
+   Undo: python3 patch-meetings-polish.py undo <folder>  (restores byte for byte). */
+function tsPolishPad2(n) { return String(n).padStart(2, '0'); }
+function tsPolishTodayYMD() { const t = new Date(); return `${t.getFullYear()}-${tsPolishPad2(t.getMonth() + 1)}-${tsPolishPad2(t.getDate())}`; }
+// The date of day d (Mon=1 … Sun=7) in the week that starts on weekStartYMD, as {ymd, text "DD/MM"}
+function tsPolishDayDate(weekStartYMD, d) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(weekStartYMD || ''));
+  if (!m) return { ymd: '', text: '' };
+  const dt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + (d - 1));
+  return { ymd: `${dt.getFullYear()}-${tsPolishPad2(dt.getMonth() + 1)}-${tsPolishPad2(dt.getDate())}`, text: `${tsPolishPad2(dt.getDate())}/${tsPolishPad2(dt.getMonth() + 1)}` };
+}
+// Marks what is happening NOW on the grid: the band, today's cell in that band, and every pill whose part
+// covers this minute. It reads the data-* the grid already carries, so it runs again every minute without redrawing.
+function tsPolishMarkNow() {
+  const grid = document.querySelector('.roster'); if (!grid) return;
+  const now = new Date(), nowMin = now.getHours() * 60 + now.getMinutes();
+  const nowEl = document.getElementById('rosterNow');
+  if (nowEl) nowEl.textContent = 'bây giờ ' + tsPolishPad2(now.getHours()) + ':' + tsPolishPad2(now.getMinutes());
+  grid.querySelectorAll('.pill--now, .roster__cell--now, .roster__head--now').forEach(el => el.classList.remove('pill--now', 'roster__cell--now', 'roster__head--now'));
+  grid.querySelectorAll('.roster__nowlabel').forEach(el => el.remove());
+  const todayCell = grid.querySelector('.roster__day--today'); if (!todayCell) return;   // another week on screen: nothing is "now"
+  const d = todayCell.getAttribute('data-day');
+  const band = (ROSTER_BANDS.find(b => nowMin >= b.lo && nowMin < b.hi) || {}).key; if (!band) return;
+  grid.querySelectorAll(`.roster__head[data-band="${band}"]`).forEach(el => el.classList.add('roster__head--now'));
+  const cell = grid.querySelector(`.roster__cell[data-day="${d}"][data-band="${band}"]`); if (!cell) return;
+  cell.classList.add('roster__cell--now');
+  let onDuty = 0;
+  cell.querySelectorAll('.pill[data-lo]').forEach(p => {
+    const lo = Number(p.getAttribute('data-lo')), hi = Number(p.getAttribute('data-hi'));
+    if (nowMin >= lo && nowMin < hi) { p.classList.add('pill--now'); onDuty++; }
+  });
+  const label = document.createElement('div');
+  label.className = 'roster__nowlabel';
+  label.textContent = onDuty ? `đang diễn ra · ${onDuty} GV đang trực` : 'đang diễn ra';
+  cell.insertBefore(label, cell.firstChild);
+}
+if (!window.__tsPolishTimer) window.__tsPolishTimer = setInterval(() => { try { tsPolishMarkNow(); } catch (e) {} }, 60 * 1000);
+/* === tansinh polish-v1 END === */
 
 // Expand weekly-recurring rows to the CURRENT displayed week
 // and deduplicate by (teacher + date + start + end)
@@ -2591,20 +2627,21 @@ function bucketizeByDayAndShift(rows) {
 // Renders the 7×3 grid
 function renderRoster(buckets, summary) {
   const sum = summary || summarizeWeekShifts(rosterUniqueRows(buckets));   // tansinh shiftdur-v1
-  let html = rosterSummaryHtml(sum) + `<div class="roster">`;
+  let html = rosterSummaryHtml(sum) + `<div class="roster" data-week-start="${wmEscape(sum.weekStart || '')}">`;   // tansinh polish-v1
   // Header row (empty corner + 3 shift headers)
   html += `<div class="roster__head"></div>`;
-  html += ROSTER_SHIFTS.map(s => `<div class="roster__head"><span>${wmEscape(s.label)}</span>${(sum.byBand && sum.byBand[s.key]) ? `<small class="roster__head-hours" title="Giờ làm trong khung này, cả tuần">${wmEscape(tsDurShort(sum.byBand[s.key]))}</small>` : ''}</div>`).join('');   // tansinh shiftdur-v1
+  html += ROSTER_SHIFTS.map(s => `<div class="roster__head" data-band="${wmEscape(s.key)}"><span class="roster__head-name">${wmEscape(s.label)}</span><span class="roster__head-sub">${s.hint ? `<small class="roster__head-hint">${wmEscape(s.hint)}</small>` : ''}${(sum.byBand && sum.byBand[s.key]) ? `<small class="roster__head-hours" title="Giờ làm trong khung này, cả tuần">${wmEscape(tsDurShort(sum.byBand[s.key]))}</small>` : ''}</span></div>`).join('');   // tansinh shiftdur-v1 + polish-v1 (hint, data-band)
 
   // 7 day rows
   for (let d = 1; d <= 7; d++) {
     const dayClass = `day-${d}`; // Mon=1 … Sun=7
     const dayMins = (sum.byDay && sum.byDay[d]) || 0;   // tansinh shiftdur-v1
-    html += `<div class="roster__day ${dayClass}"><span class="roster__day-name">${wmEscape(ROSTER_DAY_NAMES[d])}</span>${dayMins ? `<span class="roster__day-hours" title="${wmEscape('Tổng giờ các ca: ' + tsDurText(dayMins))}">${wmEscape(tsDurShort(dayMins))}</span>` : ''}</div>`;
+    const dayDate = tsPolishDayDate(sum.weekStart, d), isToday = !!dayDate.ymd && dayDate.ymd === tsPolishTodayYMD();   // tansinh polish-v1
+    html += `<div class="roster__day ${dayClass}${isToday ? ' roster__day--today' : ''}" data-day="${d}"><span class="roster__day-name">${wmEscape(ROSTER_DAY_NAMES[d])}</span>${dayDate.text ? `<span class="roster__day-date">${wmEscape(dayDate.text)}</span>` : ''}${dayMins ? `<span class="roster__day-hours" title="${wmEscape('Tổng giờ các ca: ' + tsDurText(dayMins))}">${wmEscape(tsDurShort(dayMins))}</span>` : ''}${isToday ? '<span class="roster__today">Hôm nay</span>' : ''}</div>`;   // tansinh polish-v1: date + Hôm nay
     for (const sh of ROSTER_SHIFTS) {
       const items = buckets[d][sh.key] || [];
       if (!items.length) {
-        html += `<div class="roster__cell ${dayClass}"><div class="empty-cell">—</div></div>`;
+        html += `<div class="roster__cell ${dayClass}" data-band="${wmEscape(sh.key)}" data-day="${d}"><div class="empty-cell">—</div></div>`;   // tansinh polish-v1
         continue;
       }
 // Group items by teacher email within this cell
@@ -2619,7 +2656,7 @@ function renderRoster(buckets, summary) {
         teacherGroups[key].push(r);
       }
 
-      html += `<div class="roster__cell ${dayClass}">` +
+      html += `<div class="roster__cell ${dayClass}" data-band="${wmEscape(sh.key)}" data-day="${d}">` +   // tansinh polish-v1
         teacherOrder.map(key => {
           // tansinh roster-v1 (11 Oct 2026): earliest shift first, so two shifts read top to bottom in time order
           const group = teacherGroups[key].slice().sort((a, b) => rosterSortMin(a) - rosterSortMin(b));   // tansinh shiftdur-v1: by the part shown in this column
@@ -2627,6 +2664,8 @@ function renderRoster(buckets, summary) {
           const name = r.teacher_name || r.teacher_email || '(No name)';
           const initials = wmInitials(name);
           const isMulti = group.length > 1;
+          const pLo = Math.min(...group.map(x => x._piece ? x._piece.lo : minutesFromHHMM(String(x.start_time || '0:0'))));   // tansinh polish-v1: the part in this column
+          const pHi = Math.max(...group.map(x => x._piece ? x._piece.hi : minutesFromHHMM(String(x.end_time || '0:0'))));    // tansinh polish-v1
 
           // Build time slots HTML. tansinh roster-v1: one line per shift, in the same grey as a single shift.
           // A department is written on each line only when the shifts belong to different departments.
@@ -2655,6 +2694,7 @@ function renderRoster(buckets, summary) {
   data-department="${wmEscape(r.department || '')}"
   data-band="${wmEscape(sh.key)}"
   data-minutes="${r._minutes != null ? r._minutes : shiftMinutes(r)}"
+  data-lo="${pLo}" data-hi="${pHi}"
   title="${wmEscape(name)}">
 
 <span class="pill__avatar">${wmEscape(initials)}</span>
@@ -2855,6 +2895,7 @@ const expanded = expandRecurringForWeek(rows, weekStart);
   // Load tiep-hv URLs map before rendering (so each chip can look up its Jitsi link)
   await loadTiepHvUrls(token);
   box.innerHTML = renderRoster(buckets, window.TS_SHIFTS.week);
+  try { tsPolishMarkNow(); } catch (e) { console.warn('[polish] markNow', e); }   // tansinh polish-v1
 
   // 4b) Show off teachers this week
   renderOffTeachersToday(expanded, offSet, weekStart);
