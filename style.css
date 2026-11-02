@@ -5331,3 +5331,36 @@ body:not(.app) #sidebarPageSlot { display: none; }
   .roster > .roster__cell[data-band="evening"] .empty-cell { grid-column: 1 / -1; }
 }
 /* === tansinh polish-v1 END === */
+/* === tansinh fewhv-v2 BEGIN (2 Nov 2026): the few-students warning badge, the week chip and the tooltip.
+   Amber = 1 or 2 students, red = none; the same colours as the note and request markers on the pills.
+   The badge sits at the right end of the pill; on hover the action buttons slide in to its LEFT (right: 60px).
+   Undo: python3 patch-meetings-fewhv.py undo <folder>  (restores byte for byte). === */
+.roster .pill__fewhv { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: 999px; font-size: 10px; font-weight: 700; line-height: 1.5; white-space: nowrap; cursor: help; position: relative; z-index: 2; background: #fffbeb; border: 1px solid #fcd34d; color: #b45309; font-variant-numeric: tabular-nums; }
+.roster .pill--fewhv:hover .pill__actions { right: 60px; }   /* the buttons stop short of the badge, so it is never covered */
+.roster .pill__fewhv i { font-size: 9px; }
+.roster .pill__fewhv--zero { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+.roster .pill__fewhv:hover, .roster .pill__fewhv:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
+.roster .pill--fewhv { border-color: #fcd34d; }
+.roster .pill--fewhv-zero { border-color: #fca5a5; }
+.roster__chip--fewhv { background: #fffbeb; border-color: #fcd34d; color: #b45309; cursor: help; }
+.request-tooltip.fewhv-tooltip { width: 360px; }
+.request-tooltip .fewhv-head { background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; }
+.request-tooltip .fewhv-head--zero { background: linear-gradient(135deg, #ef4444, #b91c1c); }
+.request-tooltip .fewhv-body { max-height: 380px; overflow-y: auto; }
+.request-tooltip .fewhv-when { font-size: 12px; color: #374151; padding: 2px 0 8px; border-bottom: 1px solid #f3f4f6; margin-bottom: 6px; font-variant-numeric: tabular-nums; }
+.request-tooltip .fewhv-when small { color: #6b7280; }
+.request-tooltip .fewhv-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid #f3f4f6; font-size: 12.5px; }
+.request-tooltip .fewhv-row--out { opacity: .6; }
+.request-tooltip .fewhv-time { color: #6b7280; min-width: 86px; font-variant-numeric: tabular-nums; }
+.request-tooltip .fewhv-name { flex: 1; min-width: 0; font-weight: 600; color: #1f2937; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.request-tooltip .fewhv-phu { font-style: normal; font-size: 10px; font-weight: 700; color: #7c3aed; }
+.request-tooltip .fewhv-role { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; white-space: nowrap; }
+.request-tooltip .fewhv-role--br { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+.request-tooltip .fewhv-mins { color: #374151; font-size: 11px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.request-tooltip .fewhv-empty { padding: 10px 12px; margin: 4px 0; background: #fef2f2; border-radius: 10px; font-size: 12.5px; color: #991b1b; }
+.request-tooltip .fewhv-sub { font-size: 11px; color: #6b7280; margin-top: 10px; }
+.request-tooltip .fewhv-note { font-size: 11px; color: #6b7280; margin-top: 10px; line-height: 1.45; }
+.request-tooltip .fewhv-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; font-weight: 600; color: #1d4ed8; text-decoration: none; }
+.request-tooltip .fewhv-link:hover { text-decoration: underline; }
+@media (max-width: 720px) { .roster .pill__fewhv { padding: 0 5px; } }
+/* === tansinh fewhv-v2 END === */
