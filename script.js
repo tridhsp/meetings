@@ -2547,6 +2547,238 @@ function tsPolishMarkNow() {
 }
 if (!window.__tsPolishTimer) window.__tsPolishTimer = setInterval(() => { try { tsPolishMarkNow(); } catch (e) {} }, 60 * 1000);
 /* === tansinh polish-v1 END === */
+/* === tansinh fewhv-v1 BEGIN (2 Nov 2026): a warning badge on a shift whose teacher has few or no students ===
+   WHAT IT DOES. After the grid is drawn, every pill (one teacher, one column, one day) gets a count of the
+   students that teacher handles whose lesson overlaps the pill's time window (data-lo .. data-hi, the part
+   of the shift shown in that column). 0, 1 or 2 students (FEWHV_MAX) -> a badge after the name: "1 HV" in
+   amber, "0 HV" in red. Hover, tap or focus the badge for the list. The week strip gets one chip with how
+   many shifts this week carry a badge. Every pill also carries data-fewhv-count and data-fewhv-day.
+   WHERE THE DATA COMES FROM — the same tables the "Transfer students" popup already reads from the browser:
+     student_schedule  student_email, day_of_week (0 = Sunday), time_local, teacher_email (TTKB),
+                       breakout_email (Breakout), buoi_phu
+     danh_sach_hv      ten_hv (the name), status (the lesson's minutes — the figure session.tansinh.info
+                       shows as "90 phút"), min, max
+     offdays           person_email, off_from, off_to — a student who is off on the pill's date is not counted
+   A teacher "handles" a student when student_schedule names them as teacher_email OR breakout_email (the
+   Transfer popup's rule). A buổi phụ counts as 25 minutes for a Breakout teacher (session.tansinh.info's rule).
+   A student whose minutes are unknown (0 or empty) counts when the lesson STARTS inside the window.
+   A student with two lessons in one window counts once.
+   NOT counted: substitute teachers and students moved for one day (save-student-transfer). The badge reads
+   the fixed weekly schedule plus student off-days. The tooltip says so.
+   Departments in FEWHV_SKIP_DEPTS (Supporter) have no students by design and never get a badge.
+   If danh_sach_hv cannot be read, names fall back to the email and every lesson counts by its start time.
+   If offdays cannot be read, students on leave are still counted and the tooltip says so.
+   Undo: python3 patch-meetings-fewhv.py undo <folder>  (restores byte for byte). */
+const FEWHV_MAX = 2;                       // a badge at 0, 1 or 2 students; 3 or more is normal
+const FEWHV_SKIP_DEPTS = ['supporter'];    // lowercase department names that never get a badge
+const FEWHV_PHU_MIN = 25;                  // a buổi phụ in Breakout lasts 25 minutes
+const FEWHV_CACHE_MS = 5 * 60 * 1000;      // reuse the student lists for 5 minutes
+const FEWHV_PAGE = 1000;                   // PostgREST returns at most 1000 rows per request
+let fewhvBase = null;                      // { at, sched: rows of student_schedule, hv: { email -> danh_sach_hv row } }
+let fewhvOffByWeek = {};                   // weekStartYMD -> rows of offdays, or null when that table could not be read
+let fewhvSeq = 0;                          // which draw of the grid the badges belong to
+
+async function fewhvFetchAll(table, columns, shape) {
+  const out = [];
+  for (let page = 0; page < 20; page++) {
+    let q = client.from(table).select(columns).range(page * FEWHV_PAGE, (page + 1) * FEWHV_PAGE - 1);
+    if (shape) q = shape(q);
+    const { data, error } = await q;
+    if (error) throw error;
+    out.push(...(data || []));
+    if (!data || data.length < FEWHV_PAGE) break;
+  }
+  return out;
+}
+async function fewhvLoadBase() {
+  if (fewhvBase && (Date.now() - fewhvBase.at) < FEWHV_CACHE_MS) return fewhvBase;
+  const sched = await fewhvFetchAll('student_schedule', 'student_email, day_of_week, time_local, teacher_email, breakout_email, buoi_phu');
+  const hv = {};
+  let hvRead = false;
+  try {
+    const rows = await fewhvFetchAll('danh_sach_hv', 'email, ten_hv, status, min, max');
+    for (const r of rows) if (r && r.email) hv[String(r.email).toLowerCase()] = r;
+    hvRead = true;
+  } catch (e) { console.warn('[fewhv] danh_sach_hv not readable; names fall back to the email and lessons count by their start time', e); }
+  fewhvBase = { at: Date.now(), sched, hv, hvRead };
+  return fewhvBase;
+}
+async function fewhvLoadOffdays(weekStartYMD) {
+  if (Object.prototype.hasOwnProperty.call(fewhvOffByWeek, weekStartYMD)) return fewhvOffByWeek[weekStartYMD];
+  const end = tsPolishDayDate(weekStartYMD, 7).ymd || weekStartYMD;
+  try {
+    fewhvOffByWeek[weekStartYMD] = await fewhvFetchAll('offdays', 'person_email, off_from, off_to', q => q.lte('off_from', end).gte('off_to', weekStartYMD));
+  } catch (e) { console.warn('[fewhv] offdays not readable; students on leave are still counted', e); fewhvOffByWeek[weekStartYMD] = null; }
+  return fewhvOffByWeek[weekStartYMD];
+}
+// The lesson length in minutes: status, else min, else max; a buổi phụ for a Breakout teacher is 25
+function fewhvMinutes(hvRow, isPhu, asBreakout) {
+  if (isPhu && asBreakout) return FEWHV_PHU_MIN;
+  if (!hvRow) return 0;
+  for (const k of ['status', 'min', 'max']) { const n = Number(hvRow[k]); if (n > 0) return n; }
+  return 0;
+}
+// Every student this teacher handles on one weekday, each lesson once, with inWindow = overlaps lo..hi
+function fewhvStudentsFor(email, dow, lo, hi, ymd, base, offRows) {
+  const me = String(email || '').toLowerCase();
+  const out = [];
+  if (!me) return out;
+  for (const s of base.sched) {
+    if (!s || Number(s.day_of_week) !== dow || !s.time_local) continue;
+    const asTT = String(s.teacher_email || '').toLowerCase() === me;
+    const asBR = String(s.breakout_email || '').toLowerCase() === me;
+    if (!asTT && !asBR) continue;
+    const sEmail = String(s.student_email || '').toLowerCase();
+    if (offRows && offRows.some(o => String(o.person_email || '').toLowerCase() === sEmail && o.off_from <= ymd && o.off_to >= ymd)) continue;
+    const hv = base.hv[sEmail];
+    const start = minutesFromHHMM(String(s.time_local));
+    const mins = fewhvMinutes(hv, !!s.buoi_phu, asBR && !asTT);
+    const end = mins > 0 ? start + mins : start;
+    const inWindow = mins > 0 ? (start < hi && end > lo) : (start >= lo && start < hi);
+    out.push({ email: sEmail, name: (hv && hv.ten_hv) || sEmail.split('@')[0] || sEmail, start, end, mins,
+      phu: !!s.buoi_phu, role: asBR && !asTT ? 'Breakout' : (asTT && asBR ? 'TTKB+BR' : 'TTKB'), inWindow });
+  }
+  out.sort((a, b) => a.start - b.start || a.name.localeCompare(b.name));
+  return out;
+}
+function fewhvBadgeHtml(n) {
+  const zero = n === 0;
+  const label = zero ? 'Không có học viên trong khung giờ này' : (n + ' học viên trong khung giờ này');
+  return `<span class="pill__fewhv${zero ? ' pill__fewhv--zero' : ''}" title="" role="button" tabindex="0" aria-label="${wmEscape(label)}. Rê chuột hoặc chạm để xem."><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>${n} HV</span>`;
+}
+// Draws the badges for the grid on screen. Called by loadWorkMeetings() after every draw.
+async function tsFewHvMark(weekStart) {
+  const grid = document.querySelector('.roster');
+  if (!grid || !client) return;
+  const seq = ++fewhvSeq;
+  const weekYMD = grid.getAttribute('data-week-start') || (weekStart instanceof Date ? formatYMD(weekStart) : '');
+  let base, offRows;
+  try { [base, offRows] = await Promise.all([fewhvLoadBase(), fewhvLoadOffdays(weekYMD)]); }
+  catch (e) { console.warn('[fewhv] could not read the student lists; no badges this time', e); return; }
+  if (seq !== fewhvSeq) return;                                   // the grid was drawn again while we were reading
+  const live = document.querySelector('.roster');
+  if (!live) return;
+  let flagged = 0, zeroes = 0;
+  live.querySelectorAll('.pill[data-teacher-email]').forEach(pill => {
+    pill.querySelectorAll('.pill__fewhv').forEach(b => b.remove());
+    pill.classList.remove('pill--fewhv', 'pill--fewhv-zero');
+    delete pill.dataset.fewhv;
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(pill.dataset.workDate || '');
+    if (!m) return;
+    const dow = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getDay();
+    const lo = Number(pill.dataset.lo), hi = Number(pill.dataset.hi);
+    if (!(hi > lo)) return;
+    const students = fewhvStudentsFor(pill.dataset.teacherEmail, dow, lo, hi, pill.dataset.workDate, base, offRows);
+    const count = new Set(students.filter(s => s.inWindow).map(s => s.email)).size;
+    pill.dataset.fewhvCount = String(count);
+    pill.dataset.fewhvDay = String(new Set(students.map(s => s.email)).size);
+    const dept = String(pill.dataset.department || '').trim().toLowerCase();
+    if (FEWHV_SKIP_DEPTS.includes(dept) || count > FEWHV_MAX) return;
+    pill.dataset.fewhv = JSON.stringify({ count, lo, hi, ymd: pill.dataset.workDate, dept, off: offRows ? 1 : 0, hv: base.hvRead ? 1 : 0,
+      students: students.map(s => ({ n: s.name, s: s.start, e: s.end, m: s.mins, r: s.role, p: s.phu ? 1 : 0, w: s.inWindow ? 1 : 0 })) });
+    pill.classList.add('pill--fewhv');
+    if (count === 0) pill.classList.add('pill--fewhv-zero');
+    const nameEl = pill.querySelector('.pill__name');
+    if (nameEl) nameEl.insertAdjacentHTML('beforeend', fewhvBadgeHtml(count));
+    flagged++;
+    if (count === 0) zeroes++;
+  });
+  document.querySelectorAll('#rosterSummary .roster__chip--fewhv').forEach(el => el.remove());
+  const summary = document.getElementById('rosterSummary');
+  if (summary && flagged) {
+    const chip = document.createElement('span');
+    chip.className = 'roster__chip roster__chip--fewhv';
+    chip.title = `${flagged} ca có không quá ${FEWHV_MAX} học viên trong khung giờ của ca` + (zeroes ? `, trong đó ${zeroes} ca không có học viên nào` : '') + '. Rê chuột lên huy hiệu của ca để xem.';
+    chip.textContent = `${flagged} ca ít HV`;
+    const now = document.getElementById('rosterNow');
+    if (now) summary.insertBefore(chip, now); else summary.appendChild(chip);
+  }
+  window.TS_FEWHV.last = { at: Date.now(), week: weekYMD, pills: live.querySelectorAll('.pill[data-teacher-email]').length, flagged, zeroes, offdaysRead: !!offRows, namesRead: !!base.hvRead };
+  fewhvSetupTooltip();
+}
+function fewhvTooltipHtml(pill, d) {
+  const name = pill.dataset.teacherName || pill.dataset.teacherEmail || '';
+  const email = pill.dataset.teacherEmail || '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d.ymd || '');
+  const date = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
+  const dayTxt = date ? `${ROSTER_DAY_NAMES[((date.getDay() + 6) % 7) + 1]} ${tsPolishPad2(date.getDate())}/${tsPolishPad2(date.getMonth() + 1)}` : (d.ymd || '');
+  const win = `${tsFmtMin(d.lo)}–${tsFmtMin(d.hi)}`;
+  const shift = `${pill.dataset.startTime || ''}–${pill.dataset.endTime || ''}`;
+  const inWin = (d.students || []).filter(s => s.w), outWin = (d.students || []).filter(s => !s.w);
+  const zero = d.count === 0;
+  const roleChip = (r) => `<span class="fewhv-role${r === 'Breakout' ? ' fewhv-role--br' : ''}">${wmEscape(r)}</span>`;
+  const row = (s, dim) => `<div class="fewhv-row${dim ? ' fewhv-row--out' : ''}">` +
+    `<span class="fewhv-time">${tsFmtMin(s.s)}${s.m > 0 ? '–' + tsFmtMin(s.e) : ''}</span>` +
+    `<span class="fewhv-name">${wmEscape(s.n)}${s.p ? ' <i class="fewhv-phu">phụ</i>' : ''}</span>` +
+    roleChip(s.r) + `<span class="fewhv-mins">${s.m > 0 ? s.m + ' phút' : '? phút'}</span></div>`;
+  const link = `https://session.tansinh.info/availability.html?teacher=${encodeURIComponent(email)}${d.dept === 'breakout' ? '&view=breakout' : ''}`;
+  const note = (d.hv ? 'Tính theo lịch học cố định và số phút của từng học viên' : 'Tính theo lịch học cố định (chưa đọc được số phút, nên tính theo giờ bắt đầu)')
+    + (d.off ? ', đã trừ học viên nghỉ ngày này' : '; chưa trừ học viên nghỉ')
+    + '. Chưa tính giáo viên dạy thay và học viên được chuyển trong ngày.';
+  return `<div class="tooltip-header fewhv-head${zero ? ' fewhv-head--zero' : ''}">` +
+      `<i class="fa-solid fa-triangle-exclamation"></i>` +
+      `<span>${zero ? 'Không có học viên trong khung giờ này' : 'Chỉ ' + d.count + ' học viên trong khung giờ này'}</span>` +
+      `<div class="tooltip-close-btn" data-fewhv-close><i class="fa-solid fa-xmark"></i></div></div>` +
+    `<div class="tooltip-body fewhv-body">` +
+      `<div class="tooltip-teacher-row"><div class="tooltip-avatar">${wmEscape(wmInitials(name))}</div>` +
+        `<div class="tooltip-teacher-info"><div class="tooltip-teacher">${wmEscape(name)}</div><div class="tooltip-email">${wmEscape(email)}</div></div></div>` +
+      `<div class="fewhv-when">${wmEscape(dayTxt)} · khung giờ ${wmEscape(win)}${win !== shift ? ` <small>(ca ${wmEscape(shift)})</small>` : ''}${pill.dataset.department ? ` · ${wmEscape(pill.dataset.department)}` : ''}</div>` +
+      (inWin.length ? `<div class="fewhv-list">${inWin.map(s => row(s, false)).join('')}</div>`
+                    : `<div class="fewhv-empty">Không có học viên nào có giờ học trùng khung giờ này.</div>`) +
+      (outWin.length ? `<div class="fewhv-sub">Cùng ngày, ngoài khung giờ này: ${outWin.length} học viên</div><div class="fewhv-list">${outWin.map(s => row(s, true)).join('')}</div>` : '') +
+      `<div class="fewhv-note">${wmEscape(note)}</div>` +
+      `<a class="fewhv-link" href="${link}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-calendar-check"></i> Xem lịch dạy của giáo viên trên Sessions</a>` +
+    `</div>`;
+}
+function fewhvSetupTooltip() {
+  if (document.getElementById('fewhvTooltip')) return;
+  const tip = document.createElement('div');
+  tip.id = 'fewhvTooltip';
+  tip.className = 'request-tooltip fewhv-tooltip hidden';
+  document.body.appendChild(tip);
+  let hideTimer = null, current = null;
+  const close = () => { clearTimeout(hideTimer); tip.classList.add('hidden'); current = null; };
+  const hide = () => { clearTimeout(hideTimer); hideTimer = setTimeout(close, 220); };
+  const show = (badge) => {
+    clearTimeout(hideTimer);
+    const pill = badge.closest('.pill');
+    if (!pill || !pill.dataset.fewhv) return;
+    let d;
+    try { d = JSON.parse(pill.dataset.fewhv); } catch (e) { return; }
+    current = badge;
+    tip.innerHTML = fewhvTooltipHtml(pill, d);
+    const rect = badge.getBoundingClientRect();
+    const w = Math.min(360, window.innerWidth - 40);
+    let left = rect.left + rect.width / 2;
+    left = Math.max(w / 2 + 20, Math.min(left, window.innerWidth - w / 2 - 20));
+    tip.style.left = left + 'px';
+    const below = window.innerHeight - rect.bottom;
+    if (below < 340 && rect.top > below) {
+      tip.style.top = 'auto'; tip.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
+      tip.classList.add('tooltip-above'); tip.classList.remove('tooltip-below');
+    } else {
+      tip.style.bottom = 'auto'; tip.style.top = (rect.bottom + 8) + 'px';
+      tip.classList.add('tooltip-below'); tip.classList.remove('tooltip-above');
+    }
+    tip.classList.remove('hidden');
+  };
+  const badgeOf = (e) => (e.target && e.target.closest) ? e.target.closest('.pill__fewhv') : null;
+  document.addEventListener('mouseover', (e) => { const b = badgeOf(e); if (b) show(b); });
+  document.addEventListener('mouseout', (e) => { const b = badgeOf(e); if (b && !(e.relatedTarget && tip.contains(e.relatedTarget))) hide(); });
+  document.addEventListener('focusin', (e) => { const b = badgeOf(e); if (b) show(b); });
+  document.addEventListener('focusout', (e) => { const b = badgeOf(e); if (b) hide(); });
+  document.addEventListener('click', (e) => {
+    const b = badgeOf(e);
+    if (b) { if (current === b && !tip.classList.contains('hidden')) close(); else show(b); return; }
+    if (e.target.closest && e.target.closest('[data-fewhv-close]')) { close(); return; }
+    if (!tip.contains(e.target)) close();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  tip.addEventListener('mouseenter', () => clearTimeout(hideTimer));
+  tip.addEventListener('mouseleave', hide);
+}
+window.TS_FEWHV = { max: FEWHV_MAX, skipDepts: FEWHV_SKIP_DEPTS, phuMinutes: FEWHV_PHU_MIN, mark: tsFewHvMark, studentsFor: fewhvStudentsFor, last: null };
+/* === tansinh fewhv-v1 END === */
 
 // Expand weekly-recurring rows to the CURRENT displayed week
 // and deduplicate by (teacher + date + start + end)
@@ -2896,6 +3128,7 @@ const expanded = expandRecurringForWeek(rows, weekStart);
   await loadTiepHvUrls(token);
   box.innerHTML = renderRoster(buckets, window.TS_SHIFTS.week);
   try { tsPolishMarkNow(); } catch (e) { console.warn('[polish] markNow', e); }   // tansinh polish-v1
+  try { tsFewHvMark(weekStart); } catch (e) { console.warn('[fewhv] mark', e); }   // tansinh fewhv-v1: the few-students badges, drawn once the student lists have loaded
 
   // 4b) Show off teachers this week
   renderOffTeachersToday(expanded, offSet, weekStart);
