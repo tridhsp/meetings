@@ -54,7 +54,7 @@ function hhmm(t) { return String(t == null ? '' : t).slice(0, 5); }
 function lower(s) { return String(s == null ? '' : s).trim().toLowerCase(); }
 function whoEmail(who) { return lower(who && (who.email || (who.user && who.user.email))); }
 function whoRole(who) { return String((who && (who.role || (who.user && who.user.role))) || ''); }
-function isAdmin(who) { return ['Admin', 'Super Admin'].includes(whoRole(who)); }
+function isAdmin(who) { return whoRole(who) === 'Super Admin'; }   // tansinh sr-superonly v1 (5 Nov 2026): only a Super Admin may open and decide a request
 function linkFor(id) { return SITE + '/duyet.html?yc=' + encodeURIComponent(id); }
 function statusWord(s) { return { pending: 'đang chờ duyệt', approved: 'được chấp nhận', declined: 'bị từ chối', cancelled: 'bị huỷ' }[s] || s; }
 
@@ -239,6 +239,7 @@ module.exports = function (app) {
   // ---- the admin's inbox ---------------------------------------------------------
   app.get('/sr-pending', async (req, res) => {
     const who = await gate(req, res, 'admin'); if (!who) return;
+    if (!isAdmin(who)) return res.status(403).json({ ok: false, error: 'Chỉ Super Admin xem và duyệt được yêu cầu mở lịch.' });   // tansinh sr-superonly v1
     try {
       const since = new Date(Date.now() - 3 * 86400 * 1000).toISOString();
       const [p, r] = await Promise.all([
@@ -253,6 +254,7 @@ module.exports = function (app) {
   // ---- the admin decides --------------------------------------------------------
   app.post('/sr-review', async (req, res) => {
     const who = await gate(req, res, 'admin'); if (!who) return;
+    if (!isAdmin(who)) return res.status(403).json({ ok: false, error: 'Chỉ Super Admin duyệt được yêu cầu mở lịch.' });   // tansinh sr-superonly v1
     const adminEmail = whoEmail(who);
     const b = req.body || {};
     const id = String(b.id || '').trim();
