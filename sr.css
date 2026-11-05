@@ -1,0 +1,113 @@
+/* sr.css — tansinh shift-request v1 (5 Nov 2026)
+   Shared by yeucau.html (teacher) and duyet.html (admin). The teacher block and
+   the link row are the same rules wlInjectStyles() gives the "Thêm ca làm việc"
+   popup in script.js, which these pages do not load. The rest is the small set
+   of pieces the mockup added: the page card, the status pill, the chips. */
+
+.sr-wrap { max-width: 600px; margin: 0 auto; padding: 28px 16px 48px; }
+body.sb-ready > #mainContent.sr-wrap { padding-top: 64px; }   /* room for the hamburger */
+[hidden] { display: none !important; }
+
+/* the page card: the popup's look, on a page */
+.sr-card { position: relative; background: #fff; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.14); overflow: hidden; display: flex; flex-direction: column; }
+.sr-card .modal-header { align-items: flex-start; gap: 12px; }
+.sr-card .modal-header h3 { margin: 0; font-size: 1.1rem; }
+.sr-card .modal-body { display: flex; flex-direction: column; gap: 14px; color: #374151; }
+.sr-card .modal-footer { flex-wrap: wrap; }
+.wl-sub { margin: 4px 0 0; font-size: 12px; color: #6b7280; line-height: 1.4; }
+.form-group > label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 6px; color: #111827; }
+.form-group .muted { font-weight: 400; color: #6b7280; }
+.btn-primary, .btn-ghost { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-size: 14px; line-height: 1.2; font-family: inherit; }
+.btn-primary[disabled], .btn-ghost[disabled] { opacity: .55; cursor: not-allowed; }
+.btn-ghost.danger { color: #b91c1c; border-color: #fecaca; }
+.btn-ghost.danger:hover { background: #fef2f2; }
+
+/* the teacher block, as in the popup */
+.wl-teacher { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; }
+.wl-avatar { width: 40px; height: 40px; border-radius: 50%; background: #e0ecff; color: #1d4ed8; font-weight: 700; display: grid; place-items: center; flex: none; }
+.wl-who { min-width: 0; flex: 1; }
+.wl-name { font-weight: 700; color: #111827; }
+.wl-email { font-size: 12px; color: #6b7280; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sr-date { text-align: right; flex: none; }
+.sr-date small { display: block; font-size: 11px; color: #6b7280; }
+.sr-date b { font-size: 13px; color: #111827; white-space: nowrap; }
+
+/* status pill (header) */
+.sr-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap; border: 1px solid #e5e7eb; background: #f3f4f6; color: #374151; }
+.sr-status i { width: 8px; height: 8px; border-radius: 50%; background: #9ca3af; display: inline-block; }
+.sr-status.pending { background: #fffbeb; border-color: #fde68a; color: #b45309; } .sr-status.pending i { background: #f59e0b; }
+.sr-status.approved { background: #f0fdf4; border-color: #bbf7d0; color: #15803d; } .sr-status.approved i { background: #16a34a; }
+.sr-status.declined { background: #fef2f2; border-color: #fecaca; color: #b91c1c; } .sr-status.declined i { background: #dc2626; }
+.sr-status.cancelled { background: #f3f4f6; border-color: #e5e7eb; color: #6b7280; }
+
+/* the green / amber / red notice blocks */
+.sr-notice { display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: 12px; border: 1px solid #e5e7eb; background: #f8fafc; }
+.sr-notice .sr-ico { width: 40px; height: 40px; border-radius: 50%; color: #fff; display: grid; place-items: center; flex: none; font-size: 18px; }
+.sr-notice b { display: block; font-size: 15px; }
+.sr-notice span { display: block; font-size: 13px; margin-top: 2px; line-height: 1.5; }
+.sr-notice.ok { background: #f0fdf4; border-color: #bbf7d0; } .sr-notice.ok .sr-ico { background: #16a34a; } .sr-notice.ok b { color: #14532d; } .sr-notice.ok span { color: #166534; }
+.sr-notice.warn { background: #fffbeb; border-color: #fde68a; } .sr-notice.warn .sr-ico { background: #f59e0b; } .sr-notice.warn b { color: #78350f; } .sr-notice.warn span { color: #92400e; }
+.sr-notice.bad { background: #fef2f2; border-color: #fecaca; } .sr-notice.bad .sr-ico { background: #dc2626; } .sr-notice.bad b { color: #7f1d1d; } .sr-notice.bad span { color: #991b1b; }
+.sr-info { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 10px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; font-size: 13px; line-height: 1.5; }
+.sr-info i { flex: none; margin-top: 2px; }
+
+/* chips: the summary line */
+.sr-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.sr-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #374151; padding: 6px 10px; border-radius: 999px; background: #fff; border: 1px solid #e5e7eb; font-variant-numeric: tabular-nums; }
+.sr-chip b { color: #111827; }
+.pill__dept { font-weight: 700; font-size: 11px; padding: 2px 8px; border-radius: 9999px; border: 1px solid #e5e7eb; background: #fff; font-style: normal; }
+
+/* the link box, as the popup's room box */
+.wl-room { padding: 12px 14px; border-radius: 12px; background: #f8fafc; border: 1px solid #e5e7eb; }
+.wl-room-head { font-size: 12px; color: #6b7280; margin-bottom: 8px; }
+.wl-linkrow { display: flex; align-items: center; gap: 6px; }
+.wl-linkrow .input { flex: 1; min-width: 0; font-size: 13px; background: #fff; }
+.wl-linkrow .input[readonly] { color: #374151; }
+.wl-linkrow .icon-btn { display: inline-flex; flex: none; color: #6b7280; }
+
+/* facts (admin page) */
+.sr-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.sr-fact { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid #e5e7eb; border-radius: 12px; background: #f8fafc; min-width: 0; }
+.sr-fact small { font-size: 12px; color: #6b7280; }
+.sr-fact b { font-size: 15px; color: #111827; font-variant-numeric: tabular-nums; }
+.sr-fact.wide { grid-column: 1 / -1; }
+.sr-check { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; line-height: 1.5; }
+.sr-check i { margin-top: 3px; }
+.sr-check.ok { color: #166534; font-weight: 600; }
+.sr-check.warn { color: #92400e; font-weight: 600; }
+
+/* the read-only timeline on the admin page */
+.sr-bar { padding: 0 11px; margin-top: 6px; user-select: none; }
+.sr-bar .ticks { position: relative; height: 16px; font-size: 11px; color: #9ca3af; font-variant-numeric: tabular-nums; }
+.sr-bar .tick { position: absolute; top: 0; transform: translateX(-50%); }
+.sr-bar .track { position: relative; height: 34px; }
+.sr-bar .track::before { content: ""; position: absolute; left: 0; right: 0; top: 11px; height: 8px; border-radius: 999px; background: #e5e7eb; }
+.sr-bar .mark { position: absolute; top: 21px; width: 1px; height: 5px; background: #cbd5e1; transform: translateX(-50%); }
+.sr-bar .band { position: absolute; top: 8px; height: 14px; border-radius: 999px; background: var(--primary, #0d6efd); }
+.sr-bar .band.other { background: #cbd5e1; }
+.sr-bar .band span { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 700; color: #1d4ed8; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sr-bar .band.other span { color: #64748b; font-weight: 600; }
+
+/* the admin inbox list */
+.sr-list { display: flex; flex-direction: column; gap: 8px; }
+.sr-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; text-decoration: none; color: inherit; }
+.sr-row:hover { border-color: #cbd5e1; background: #f9fafb; }
+.sr-row .sr-row-main { flex: 1; min-width: 0; }
+.sr-row .sr-row-name { font-weight: 700; color: #111827; }
+.sr-row .sr-row-meta { font-size: 12px; color: #6b7280; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.sr-empty { color: #9ca3af; font-size: 13px; text-align: center; padding: 10px; }
+
+/* conflicts (overlap) */
+.sr-conflicts { display: flex; flex-direction: column; gap: 6px; }
+.sr-conflict { padding: 8px 12px; border-radius: 10px; background: #fff7ed; border: 1px solid #fed7aa; font-size: 13px; color: #7c2d12; font-variant-numeric: tabular-nums; }
+
+/* the message line under the card */
+#message { text-align: center; }
+#message.error { color: #d52731; }
+#message.success { color: #269f53; }
+
+@media (max-width: 480px) {
+  .sr-facts { grid-template-columns: 1fr; }
+  .sr-date { text-align: left; }
+  .wl-teacher { flex-wrap: wrap; }
+}

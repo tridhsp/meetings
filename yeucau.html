@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>Yêu cầu tạo lịch</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="https://files.tansinh.info/ads/tridhsp_1752750602636_ad_tridhsp_1752750602636.png" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css?v=20261102_1129_1010_0904_2145_2041_1853_1526_sb1_rs1_sd1_pl2_fh2" />
+  <link rel="stylesheet" href="sr.css?v=sr1" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.4/dist/umd/supabase.js" defer></script>
+  <script src="timepick.js?v=sr1" defer></script>
+  <script src="yeucau.js?v=sr1" defer></script>
+  <script>window.addEventListener('pageshow', function(e) { if (e.persisted) location.reload(); });</script>
+</head>
+<body style="display:block; place-items:unset;">
+  <script src="sidebar.js?v=20261102_1129_1010_0904_2145_2041_1853_1526_sb1"></script><!-- tansinh sb-v1: the shared sidebar. Keep this line right after <body>. -->
+
+  <div id="mainContent" class="sr-wrap">
+
+    <!-- ---------- Login card: shown only when there is no login to use (same markup as index.html) ---------- -->
+    <div class="card" id="loginCard" hidden>
+      <div class="logo">Meetings</div>
+      <div class="subtitle">Đăng nhập để gửi yêu cầu tạo lịch</div>
+      <div class="field">
+        <input id="email" type="email" autocomplete="username" placeholder="Email" required />
+      </div>
+      <div class="field">
+        <input id="password" type="password" autocomplete="current-password" placeholder="Mật khẩu" required />
+        <button class="toggle-password" id="togglePwd" aria-label="Hiện/ẩn mật khẩu" type="button">👁️</button>
+      </div>
+      <button class="btn" id="login" type="button">Đăng nhập</button>
+      <div id="loginMsg" aria-live="polite"></div>
+    </div>
+
+    <!-- ---------- The request card ---------- -->
+    <div class="sr-card" id="srCard" hidden>
+      <div class="modal-header">
+        <div>
+          <h3 id="srTitle">Yêu cầu tạo lịch</h3>
+          <p class="wl-sub" id="srSub">Dùng khi bạn đang làm mà ca hôm nay chưa có trên lịch. Admin chấp nhận là ca được tạo và realtimereport mở lại.</p>
+        </div>
+        <span class="sr-status" id="srStatus" hidden><i aria-hidden="true"></i><span id="srStatusText"></span></span>
+      </div>
+
+      <div class="modal-body">
+
+        <div class="wl-teacher" id="srTeacher">
+          <div class="wl-avatar" id="srAvatar" aria-hidden="true">GV</div>
+          <div class="wl-who">
+            <div class="wl-name" id="srName">…</div>
+            <div class="wl-email" id="srEmail"></div>
+          </div>
+          <div class="sr-date">
+            <small>Ngày làm việc</small>
+            <b id="srDate">Hôm nay</b>
+          </div>
+        </div>
+
+        <!-- loading -->
+        <div id="vLoading" class="sr-empty">Đang tải…</div>
+
+        <!-- the form -->
+        <div id="vForm" hidden>
+          <p class="hint" id="srShiftsToday" hidden></p>
+
+          <div class="form-group">
+            <label for="srDept">Bộ phận</label>
+            <select id="srDept" class="input">
+              <option value="">— Chọn —</option>
+              <option value="TTKB">TTKB</option>
+              <option value="Breakout">Breakout</option>
+              <option value="BM">BM</option>
+              <option value="Supporter">Supporter</option>
+              <option value="Mix">Mix</option>
+            </select>
+            <p class="hint" id="srDeptHint" hidden>Điền sẵn theo ca gần nhất của bạn. Đổi nếu hôm nay làm bộ phận khác.</p>
+          </div>
+
+          <div class="form-group wl-time">
+            <label>Giờ làm việc</label>
+            <div id="srPick"></div>
+            <p class="hint">Bấm ca mẫu, kéo thanh thời gian, bấm − +, hoặc gõ giờ (9h30, 930 đều được). Dời giờ bắt đầu thì giờ kết thúc dời theo.</p>
+          </div>
+
+          <div class="form-group">
+            <label for="srNote">Ghi chú cho admin <span class="muted">(không bắt buộc)</span></label>
+            <input type="text" id="srNote" class="input" maxlength="300" placeholder="VD: lịch tuần này chưa được cập nhật" />
+          </div>
+
+          <div class="sr-info">
+            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+            <span>Yêu cầu chỉ cho <b>hôm nay</b>, không lặp lại hàng tuần. Sau khi admin chấp nhận, realtimereport của bạn mở lại trong vòng 1 phút, không cần tải lại trang.</span>
+          </div>
+        </div>
+
+        <!-- sent, waiting -->
+        <div id="vSent" hidden>
+          <div class="sr-notice ok">
+            <span class="sr-ico"><i class="fa-solid fa-check" aria-hidden="true"></i></span>
+            <div><b>Đã gửi yêu cầu</b><span>Admin chấp nhận là ca được tạo và realtimereport mở lại trong vòng 1 phút. Trang này tự cập nhật.</span></div>
+          </div>
+          <div class="sr-chips" id="srChips"></div>
+          <div class="wl-room">
+            <div class="wl-room-head">Link cho admin: gửi qua Zalo hoặc Chat. Chỉ Admin và Super Admin mở được.</div>
+            <div class="wl-linkrow">
+              <input type="text" id="srLink" class="input" readonly aria-label="Link cho admin" />
+              <button type="button" class="icon-btn" id="srCopySmall" title="Sao chép link" aria-label="Sao chép link"><i class="fa-regular fa-copy" aria-hidden="true"></i></button>
+            </div>
+            <p class="hint" id="srNoteEcho" hidden></p>
+          </div>
+        </div>
+
+        <!-- approved -->
+        <div id="vDone" hidden>
+          <div class="sr-notice ok">
+            <span class="sr-ico"><i class="fa-solid fa-calendar-check" aria-hidden="true"></i></span>
+            <div><b>Admin đã tạo ca cho bạn</b><span id="srDoneText">Ca đã có trên lịch. realtimereport của bạn mở lại trong vòng 1 phút, không cần tải lại trang.</span></div>
+          </div>
+          <div class="sr-chips" id="srChipsDone"></div>
+        </div>
+
+        <!-- declined -->
+        <div id="vDeclined" hidden>
+          <div class="sr-notice bad">
+            <span class="sr-ico"><i class="fa-solid fa-xmark" aria-hidden="true"></i></span>
+            <div><b>Admin đã từ chối yêu cầu này</b><span id="srDeclineText"></span></div>
+          </div>
+          <div class="sr-chips" id="srChipsDeclined"></div>
+        </div>
+
+        <!-- an error that stops the page -->
+        <div id="vError" hidden>
+          <div class="sr-notice warn">
+            <span class="sr-ico"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i></span>
+            <div><b>Chưa mở được trang</b><span id="srErrorText"></span></div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-ghost" id="btnCancelReq" hidden><i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Huỷ yêu cầu</button>
+        <button type="button" class="btn-ghost" id="btnAgain" hidden><i class="fa-solid fa-plus" aria-hidden="true"></i> Gửi yêu cầu khác</button>
+        <a class="btn-ghost" id="btnRoster" href="index.html" hidden><i class="fa-solid fa-calendar-days" aria-hidden="true"></i> Xem lịch</a>
+        <button type="button" class="btn-primary" id="btnCopy" hidden><i class="fa-regular fa-copy" aria-hidden="true"></i> Sao chép link</button>
+        <button type="button" class="btn-primary" id="btnSend" hidden><i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Gửi yêu cầu mở lịch</button>
+      </div>
+    </div>
+
+    <div id="message" aria-live="polite"></div>
+  </div>
+</body>
+</html>
