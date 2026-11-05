@@ -200,7 +200,7 @@
       else paintList(await api('/sr-pending'));
     } catch (e) {
       if (e && e.status === 401) { showLogin(''); return; }
-      if (e && e.status === 403) { showError(st.id ? 'Yêu cầu này không phải của bạn, và tài khoản của bạn không phải Admin.' : 'Trang này dành cho Admin và Super Admin.'); return; }
+      if (e && e.status === 403) { showError(st.id ? 'Yêu cầu này không phải của bạn, và chỉ Super Admin duyệt được.' : 'Trang này dành cho Super Admin.')   /* tansinh sr-superonly v1 */; return; }
       showError((e && e.error) || 'Không tải được.');
     }
   }
