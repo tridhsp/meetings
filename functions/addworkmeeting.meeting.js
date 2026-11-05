@@ -46,17 +46,21 @@ module.exports = function(app) {
       if (!forceOverlap) {
         const { data: existing } = await supabase.from('meeting_content')
           .select('id, teacher_name, work_date, start_time, end_time, is_one_time, department')
-          .eq('teacher_email', teacherEmail);
+          .ilike('teacher_email', teacherEmail);   // tansinh shift-dates v1: case-insensitive, like the roster
 
         if (existing && existing.length > 0) {
           const newDow = new Date(workDate + 'T00:00:00').getDay();
           const newIsRecurring = !(insertRow.is_one_time);
+          const todayYMD = (() => { const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();   // tansinh shift-dates v1: today in Vietnam
           const conflicts = existing.filter(row => {
             const rowDow = new Date(row.work_date + 'T00:00:00').getDay();
             const sameDate = row.work_date === workDate;
             const sameDow = rowDow === newDow;
             const rowIsRecurring = !row.is_one_time;
-            const dateMatch = sameDate || (sameDow && (rowIsRecurring || newIsRecurring));
+            /* tansinh shift-dates v1 (5 Nov 2026): a weekly row counts on its weekday; a one-time row counts on its own
+               date only, and against a NEW weekly shift only if that date is today or later. Before this, a one-time
+               row from 2025 "conflicted" with every new weekly shift on that weekday for ever. */
+            const dateMatch = rowIsRecurring ? sameDow : (newIsRecurring ? (sameDow && row.work_date >= todayYMD) : sameDate);
             if (!dateMatch) return false;
             const rStart = (row.start_time || '').slice(0, 5);
             const rEnd = (row.end_time || '').slice(0, 5);

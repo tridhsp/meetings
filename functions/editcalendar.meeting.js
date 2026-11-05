@@ -167,19 +167,23 @@ module.exports = function (app) {
 
         const qOvl = new URLSearchParams();
         qOvl.set('select', 'id,teacher_name,work_date,start_time,end_time,is_one_time,department');
-        qOvl.set('teacher_email', `eq.${merged.teacher_email}`);
+        qOvl.set('teacher_email', `ilike.${merged.teacher_email}`);   // tansinh shift-dates v1: case-insensitive, like the roster
         qOvl.set('id', `neq.${id}`);
         const existing = await sbSelect('meeting_content', qOvl.toString());
 
         if (existing && existing.length > 0) {
           const newDow = new Date(merged.work_date + 'T00:00:00').getDay();
           const newIsRecurring = !merged.is_one_time;
+          const todayYMD = (() => { const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();   // tansinh shift-dates v1: today in Vietnam
           const conflicts = existing.filter(row => {
             const rowDow = new Date(row.work_date + 'T00:00:00').getDay();
             const sameDate = row.work_date === merged.work_date;
             const sameDow = rowDow === newDow;
             const rowIsRecurring = !row.is_one_time;
-            const dateMatch = sameDate || (sameDow && (rowIsRecurring || newIsRecurring));
+            /* tansinh shift-dates v1 (5 Nov 2026): a weekly row counts on its weekday; a one-time row counts on its own
+               date only, and against a NEW weekly shift only if that date is today or later. Before this, a one-time
+               row from 2025 "conflicted" with every new weekly shift on that weekday for ever. */
+            const dateMatch = rowIsRecurring ? sameDow : (newIsRecurring ? (sameDow && row.work_date >= todayYMD) : sameDate);
             if (!dateMatch) return false;
             const rStart = (row.start_time || '').slice(0, 5);
             const rEnd = (row.end_time || '').slice(0, 5);
