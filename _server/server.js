@@ -87,6 +87,7 @@ require('./routes/confirm-free-hours.meeting')(app);
 // --- Meeting Batch 2 (migrated from Netlify) ---
 require("./routes/addmeeting.meeting")(app);
 require("./routes/addworkmeeting.meeting")(app);
+require("./routes/sr-api.meeting")(app);   // tansinh shift-request v1 (5 Nov 2026): the shift-request routes
 require("./routes/assigned-owners-today.meeting")(app);
 require("./routes/confirm-week.meeting")(app);
 require("./routes/deletecalendar.meeting")(app);
@@ -143,6 +144,8 @@ require("./routes/save-start-work.realtimereport")(app);
 // --- RealtimeReport Batch 4 (FINAL) ---
 require("./routes/end-work-shift.realtimereport")(app);
 require("./routes/update-link.realtimereport")(app);
+require("./routes/rtr-card-done.realtimereport")(app);     // tansinh rtr-close v1
+require("./routes/rtr-parent-link.realtimereport")(app);   // tansinh rtr-close v1
 require("./routes/delete-work-row.realtimereport")(app);
 require("./routes/delete-my-incomplete-task.realtimereport")(app);
 require("./routes/work-comments.realtimereport")(app);
