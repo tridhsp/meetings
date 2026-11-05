@@ -554,6 +554,34 @@ function wlIndexRooms(rows) {
   });
   return by;
 }
+/* === tansinh shift-request v1 BEGIN (5 Nov 2026): the "Yêu cầu" mark on a shift an admin created from a
+   teacher's request (yeucau.html / duyet.html). The roster asks /sr-badges for the week being shown and keys the
+   mark on the shift's own id, so nothing on meeting_content changed. v1.1: a round corner mark at the pill's
+   bottom-left (position:absolute, like .pill-alert-marker and .pill-note-marker), so it takes no room in the
+   row. Undo: patch-meetings-srbadge.py undo === */
+let srBadgeMap = new Map();   // meeting_content id -> { teacher_email, created_at, reviewed_by, reviewed_at }
+function srInjectBadgeStyles() {
+  if (document.getElementById('tsSrBadgeStyles')) return;
+  const st = document.createElement('style');
+  st.id = 'tsSrBadgeStyles';
+  st.textContent = '.pill-req-marker{position:absolute;bottom:-6px;left:-6px;width:20px;height:20px;background:#7c3aed;color:#fff;border-radius:50%;display:grid;place-items:center;font-size:9px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 6px rgba(124,58,237,.4);z-index:5;cursor:help}'
+    + '.pill-req-marker i{font-size:9px;line-height:1}';
+  document.head.appendChild(st);
+}
+function srBadgeTitle(b) {
+  const t = (iso) => { const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' }); };
+  return 'Ca tạo theo yêu cầu của giáo viên' + (b && b.created_at ? ' · gửi ' + t(b.created_at) : '')
+    + (b && b.reviewed_at ? ' · duyệt ' + t(b.reviewed_at) + (b.reviewed_by ? ' (' + b.reviewed_by + ')' : '') : '');
+}
+async function srLoadBadges(from, to, token) {
+  srBadgeMap = new Map();
+  try {
+    const r = await fetch(`${_DO}/sr-badges?from=${from}&to=${to}`, { headers: { Authorization: `Bearer ${token}` } });
+    const out = await r.json().catch(() => ({}));
+    if (r.ok && Array.isArray(out.items)) out.items.forEach(b => { if (b && b.meeting_content_id) srBadgeMap.set(String(b.meeting_content_id), b); });
+  } catch (e) { /* no badges this time; the roster still paints */ }
+}
+/* === tansinh shift-request v1 END === */
 function wlInjectStyles() {
   if (document.getElementById('tsWatchLinkStyles')) return;
   const st = document.createElement('style');
@@ -2944,6 +2972,7 @@ function renderRoster(buckets, summary) {
   data-lo="${pLo}" data-hi="${pHi}"
   title="${wmEscape(name)}">
 
+${(() => { const b = group.map(x => srBadgeMap.get(String(x.id))).find(Boolean); return b ? `<span class="pill-req-marker" title="${wmEscape(srBadgeTitle(b))}" aria-label="Ca tạo theo yêu cầu của giáo viên"><i class="fa-solid fa-paper-plane" aria-hidden="true"></i></span>` : ``; })()}${'' /* tansinh shift-request v1 */}
 <span class="pill__avatar">${wmEscape(initials)}</span>
 <span class="pill__name">${wmEscape(name)}</span>
 <span class="pill__meta">
@@ -3124,6 +3153,7 @@ async function loadWorkMeetings() {
   });
   const offOut = await offRes.json().catch(() => ({}));
   const offSet = new Set((offOut.rows || []).map(r => `${r.meeting_content_id}|${r.off_date}`));
+  srInjectBadgeStyles(); await srLoadBadges(from, to, token);   // tansinh shift-request v1: which shifts came from a request
 
   // 3) Expand recurring → keep only this week → remove off-days
   const rows = out.rows || [];
