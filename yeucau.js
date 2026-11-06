@@ -205,7 +205,10 @@
     $('srSub').textContent = 'Admin duyệt lúc ' + timeLabel(r.reviewed_at) + (r.reviewed_by ? ' (' + r.reviewed_by + ')' : '');
     setStatus('approved');
     $('srChipsDone').innerHTML = chipsHtml(r);
-    show('vDone', ['btnRoster']);
+    /* tansinh sr-again v1: a teacher may need another shift the same day (an early one has passed, or more hours).
+       /sr-create refuses only while a request is PENDING, so a new one after an approval goes through. */
+    try { const dt = $('srDoneText'); if (dt && dt.textContent.indexOf('Gửi yêu cầu khác') < 0) dt.textContent += ' Cần thêm một ca nữa hôm nay? Bấm Gửi yêu cầu khác.'; } catch (e) { }
+    show('vDone', ['btnRoster', 'btnAgain']);   // tansinh sr-again v1: a second request after an approved one (the server allows it: one PENDING per day)
   }
   function showDeclined(r) {
     st.req = r; stopPoll();

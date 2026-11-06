@@ -1070,6 +1070,8 @@ require("./routes/bm-student-picture.baihoc")(app); // BKMGMT-20261011 Book mana
 require('./routes/sub-session.submit')(app); /* TSPATCH-SUBSESSION-20261012 */
 require('./routes/sub-chuanop.submit')(app);   // TSPATCH-SUBCHUANOP-20261013
 require("./routes/tv-api.thuvien")(app);
+require("./routes/lc-api.lichca")(app);   // tansinh lichca v1 (6 Nov 2026)
+require("./routes/lc-image.lichca")(app);   // tansinh lichca v6: pasted images in a report (Versity)
 app.listen(PORT, () => {
   console.log('API server running on port ' + PORT);
 });
